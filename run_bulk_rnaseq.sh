@@ -7,11 +7,13 @@
 #SBATCH --cpus-per-task=4
 #SBATCH --mem-per-cpu=30000
 #SBATCH --time=12:00:00
-#SBATCH -o bulk_rnaseq.%A.o
-#SBATCH -e bulk_rnaseq.%A.e
+#SBATCH -o mrnaseq.%A.o
+#SBATCH -e mrnaseq.%A.e
 
 module load nextflow/22.04.3
+module load singularity/3.8.0
 
-nextflow run bulk_rnaseq.nf
+nextflow run bulk_rnaseq.nf -c ./conf/run.config -resume
 
 module unload nextflow/22.04.3
+module unload singularity/3.8.0

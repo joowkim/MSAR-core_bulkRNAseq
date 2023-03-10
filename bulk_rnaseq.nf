@@ -24,14 +24,46 @@ process FASTQC {
     """
 }
 
-process FASTP {
+// process FASTP {
+//     debug true
+//     tag "Fastp on ${sample_name}"
+//     // label "universal"
+//     cpus 8
+//     memory '8 GB'
+//
+//     publishDir "${projectDir}/analysis/fastp/"
+//
+//     module 'fastp/0.21.0'
+//
+//     input:
+//     tuple val(sample_name), path(reads)
+//
+//     output:
+//     tuple val(sample_name), path("${sample_name}_trimmed.R{1,2}.fq.gz"), emit: trim_reads
+//     path("${sample_name}.fastp.json"), emit: json
+//
+//     script:
+//     """
+//     fastp \
+//     -i ${reads[0]} \
+//     -I ${reads[1]} \
+//     --thread ${task.cpus} \
+//     --detect_adapter_for_pe \
+//     --qualified_quality_phred 25 \
+//     -o ${sample_name}_trimmed.R1.fq.gz \
+//     -O ${sample_name}_trimmed.R2.fq.gz \
+//     --json ${sample_name}.fastp.json
+//     """
+// }
+
+process TRIM_GALORE {
     debug true
-    tag "Fastp on ${sample_name}"
+    tag "trim_galore on ${sample_name}"
     // label "universal"
     cpus 8
     memory '8 GB'
 
-    publishDir "${projectDir}/analysis/fastp/"
+    publishDir "${projectDir}/analysis/trim_galore/"
 
     module 'fastp/0.21.0'
 
@@ -39,20 +71,20 @@ process FASTP {
     tuple val(sample_name), path(reads)
 
     output:
-    tuple val(sample_name), path("${sample_name}.trimmed.R{1,2}.fq.gz"), emit: trim_reads
-    path("${sample_name}.fastp.json"), emit: json
+    tuple val(sample_name), path("*.gz"), emit: trim_reads
+    path("*.html")
+    path("*.zip")
+    path("*.txt")
 
     script:
     """
-    fastp \
-    -i ${reads[0]} \
-    -I ${reads[1]} \
-    --thread ${task.cpus} \
-    --detect_adapter_for_pe \
-    --qualified_quality_phred 25 \
-    -o ${sample_name}.trimmed.R1.fq.gz \
-    -O ${sample_name}.trimmed.R2.fq.gz \
-    --json ${sample_name}.fastp.json
+    trim_galore \
+    --paired \
+    ${reads[0]} ${reads[1]} \
+    --cores ${task.cpus} \
+    -q 20 \
+    --fastqc \
+    --output_dir ./
     """
 }
 
@@ -122,39 +154,48 @@ process SEQTK {
     """
 }
 
-// process SORTMERNA {
-//     debug true
-//     tag "SortMeRNA on ${sample_name}"
-//
-//     cpus 4
-//     memory '8 GB'
-//
-//     publishDir "${projectDir}/analysis/sortMeRNA"
-//
-//     module load 'sortmerna/4.3.6'
-//
-//     input:
-//     tuple val(sample_name), path(reads)
-//
-//     output:
-//     //
-//
-//     script:
-//     """
-//     sortmerna --threads 4 \
-//     -reads ${reads[0]} ${reads[1]} \
-//     --workdir ./  \
-//     --idx-dir {params.idx_dir}  \
-//     --ref {params.rfam5s}  \
-//     --ref {params.rfam5_8s}  \
-//     --ref {params.silva_arc_16s}  \
-//     --ref {params.silva_arc_23s}  \
-//     --ref {params.silva_bac_16s}  \
-//     --ref {params.silva_bac_23s}  \
-//     --ref {params.silva_euk_18s}  \
-//     --ref {params.silva_euk_28s}
-//     """
-// }
+ process SORTMERNA {
+     debug true
+     tag "SortMeRNA on ${sample_name}"
+
+     cpus 8
+     memory '8 GB'
+
+     publishDir "${projectDir}/analysis/sortMeRNA/"
+
+     module 'sortmerna/4.3.6'
+
+     input:
+     tuple val(sample_name), path(reads)
+
+     output:
+     path ("*"), emit: sortMeRNA_out
+
+     script:
+     idx = "/mnt/beegfs/kimj32/tools/sortmerna/idx"
+     rfam5_8s = "/home/kimj32/beegfs/tools/sortmerna/data/rRNA_databases/rfam-5.8s-database-id98.fasta"
+     rfam5s = "/home/kimj32/beegfs/tools/sortmerna/data/rRNA_databases/rfam-5s-database-id98.fasta"
+     silva_arc_16s = "/home/kimj32/beegfs/tools/sortmerna/data/rRNA_databases/silva-arc-16s-id95.fasta"
+     silva_arc_23s = "/home/kimj32/beegfs/tools/sortmerna/data/rRNA_databases/silva-arc-23s-id98.fasta"
+     silva_euk_18s = "/home/kimj32/beegfs/tools/sortmerna/data/rRNA_databases/silva-euk-18s-id95.fasta"
+     silva_euk_28s = "/home/kimj32/beegfs/tools/sortmerna/data/rRNA_databases/silva-euk-28s-id98.fasta"
+     silva_bac_16s = "/home/kimj32/beegfs/tools/sortmerna/data/rRNA_databases/silva-bac-16s-id90.fasta"
+     silva_bac_23s = "/home/kimj32/beegfs/tools/sortmerna/data/rRNA_databases/silva-bac-23s-id98.fasta"
+     """
+     sortmerna --threads ${task.cpus} \
+     -reads ${reads[0]} \
+     --workdir ${sample_name}  \
+     --idx-dir ${idx}  \
+     --ref ${rfam5s}  \
+     --ref ${rfam5_8s}  \
+     --ref ${silva_arc_16s}  \
+     --ref ${silva_arc_23s}  \
+     --ref ${silva_bac_16s}  \
+     --ref ${silva_bac_23s}  \
+     --ref ${silva_euk_18s}  \
+     --ref ${silva_euk_28s}
+     """
+}
 
 
 process MULTIQC {
@@ -204,8 +245,7 @@ process QUALIMAP {
     -gtf ${gtf} \
     --paired \
     -outdir ${sample_name} \
-    --sequencing-protocol strand-specific-reverse \
-    --java-mem-size=8G
+    --sequencing-protocol strand-specific-reverse
     """
 }
 
@@ -240,18 +280,28 @@ process FASTQSCREEN {
 
 }
 
+log.info """
+bulkRNAseq Nextflow
+=============================================
+reads                           : ${params.reads}
+reference                       : ${params.ref_fa.(params.genome)}
+"""
+
+reference = Channel.fromPath(params.ref_fa.(params.genome), checkIfExists: true)
 
 workflow {
-    reads_ch = Channel.fromFilePairs("${projectDir}/rename/*_R{1,2}.f{astq,q}.gz", checkIfExists: true)
+    reads_ch = Channel.fromFilePairs(params.reads, checkIfExists: true)
     FASTQC(reads_ch)
-    FASTP(reads_ch)
-    SEQTK(FASTP.out.trim_reads)
+    TRIM_GALORE(reads_ch)
+    SEQTK(TRIM_GALORE.out.trim_reads)
     FASTQSCREEN(SEQTK.out.subsample_reads)
-    STAR(FASTP.out.trim_reads)
+    STAR(TRIM_GALORE.out.trim_reads)
+    SORTMERNA(SEQTK.out.subsample_reads)
     QUALIMAP(STAR.out.bam)
     MULTIQC(QUALIMAP.out.qualimap_out | collect )
+    //MULTIQC(SORTMERNA.out.sortMeRNA_out | collect )
 }
 
-// how to run
-// nextflow run salmon.nf -c salmon.config
-// -process.echo is optional
+workflow.onComplete {
+	println ( workflow.success ? "\nDone!" : "Oops .. something went wrong" )
+}
