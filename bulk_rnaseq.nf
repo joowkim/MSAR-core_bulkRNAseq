@@ -60,7 +60,7 @@ process TRIM_GALORE {
     debug true
     tag "trim_galore on ${sample_name}"
     // label "universal"
-    cpus 8
+    cpus 4
     memory '8 GB'
 
     publishDir "${projectDir}/analysis/trim_galore/"
@@ -93,9 +93,9 @@ process STAR {
     tag "STAR on ${sample_name}"
     // label "universal"
     cpus 8
-    memory '128 GB'
+    memory '64 GB'
 
-    publishDir "${projectDir}/analysis/star/"
+    publishDir "${projectDir}/analysis/star/", mode : "copy"
 
     module "STAR/2.7.10a"
     module 'samtools/1.16.1'
@@ -184,7 +184,7 @@ process SEQTK {
      """
      sortmerna --threads ${task.cpus} \
      -reads ${reads[0]} \
-     --workdir ${sample_name}  \
+     --workdir sortMeRNA_${sample_name}  \
      --idx-dir ${idx}  \
      --ref ${rfam5s}  \
      --ref ${rfam5_8s}  \
@@ -213,7 +213,7 @@ process MULTIQC {
     path(files)
 
     output:
-    path("*.html")
+    path("*.html"), emit: multiqc_output
 
     script:
     """
@@ -244,7 +244,8 @@ process QUALIMAP {
     qualimap rnaseq -bam ${bam} \
     -gtf ${gtf} \
     --paired \
-    -outdir ${sample_name} \
+    -outdir quailmap_${sample_name} \
+    --java-mem-size=6G \
     --sequencing-protocol strand-specific-reverse
     """
 }
@@ -253,7 +254,7 @@ process FASTQSCREEN {
     debug true
     tag "Fastq-screen on ${sample_name}"
 
-    cpus 8
+    cpus 4
     memory '8 GB'
 
     publishDir "${projectDir}/analysis/fastq_screen"
@@ -268,17 +269,46 @@ process FASTQSCREEN {
     path("*.html")
     path("*.txt")
 
+    // threads option is already defined in fastq_screeN_conf
     script:
     conf = params.fastq_screen_conf
     """
     fastq_screen --aligner bowtie2 \
-    --threads ${task.cpus} \
     --conf ${conf} \
     ${reads[0]} \
     --outdir ./
     """
-
 }
+
+process TPMCALCULATOR {
+    debug true
+    tag "tpm_calculator on ${sample_name}"
+
+    cpus 4
+    memory '8 GB'
+
+    publishDir "${projectDir}/analysis/tpm_calculator/"
+
+    module "TPMCalculator/0.4.0"
+
+    input:
+    tuple val(sample_name), path(bam_file)
+
+    output:
+    path("*out"), emit : "tpm_calculator_out"
+
+    script:
+    // -p option is for paired end data
+    gtf = params.gtf.(params.genome)
+    """
+    TPMCalculator -g ${gtf} \
+    -b ${bam_file} \
+    -p
+
+    /home/kimj32/basic-tools/renamer 's/.Aligned.sortedByCoord.out_genes//' *out_genes*
+    """
+}
+
 
 log.info """
 bulkRNAseq Nextflow
@@ -290,6 +320,7 @@ reference                       : ${params.ref_fa.(params.genome)}
 reference = Channel.fromPath(params.ref_fa.(params.genome), checkIfExists: true)
 
 workflow {
+
     reads_ch = Channel.fromFilePairs(params.reads, checkIfExists: true)
     FASTQC(reads_ch)
     TRIM_GALORE(reads_ch)
@@ -298,8 +329,9 @@ workflow {
     STAR(TRIM_GALORE.out.trim_reads)
     SORTMERNA(SEQTK.out.subsample_reads)
     QUALIMAP(STAR.out.bam)
-    MULTIQC(QUALIMAP.out.qualimap_out | collect )
-    //MULTIQC(SORTMERNA.out.sortMeRNA_out | collect )
+    TPMCALCULATOR(STAR.out.bam)
+    MULTIQC( QUALIMAP.out.qualimap_out.mix(SORTMERNA.out.sortMeRNA_out).collect() )
+
 }
 
 workflow.onComplete {
