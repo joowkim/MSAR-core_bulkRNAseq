@@ -1,0 +1,7 @@
+sample,fq1,fq2
+Air,/Users/kimj32/PycharmProjects/bulkRNAseq/rename/Air_1_R1.fastq.gz,/Users/kimj32/PycharmProjects/bulkRNAseq/rename/Air_1_R2.fastq.gz
+Air,/Users/kimj32/PycharmProjects/bulkRNAseq/rename/Air_2_R1.fastq.gz,/Users/kimj32/PycharmProjects/bulkRNAseq/rename/Air_2_R2.fastq.gz
+Air,/Users/kimj32/PycharmProjects/bulkRNAseq/rename/Air_3_R1.fastq.gz,/Users/kimj32/PycharmProjects/bulkRNAseq/rename/Air_3_R2.fastq.gz
+Nic,/Users/kimj32/PycharmProjects/bulkRNAseq/rename/Nic_1_R1.fastq.gz,/Users/kimj32/PycharmProjects/bulkRNAseq/rename/Nic_1_R2.fastq.gz
+Nic,/Users/kimj32/PycharmProjects/bulkRNAseq/rename/Nic_2_R1.fastq.gz,/Users/kimj32/PycharmProjects/bulkRNAseq/rename/Nic_2_R2.fastq.gz
+Nic,/Users/kimj32/PycharmProjects/bulkRNAseq/rename/Nic_3_R1.fastq.gz,/Users/kimj32/PycharmProjects/bulkRNAseq/rename/Nic_3_R2.fastq.gz

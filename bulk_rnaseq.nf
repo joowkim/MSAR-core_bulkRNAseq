@@ -2,7 +2,7 @@ nextflow.enable.dsl=2
 
 process FASTQC {
     debug true
-    tag "Fastqc on ${sample_name}"
+    //tag "Fastqc on ${meta.sample_name}"
     //label "universal" // getting cpu and memory usage from salmon.config - called universal
     cpus 8
     memory '4 GB'
@@ -12,7 +12,7 @@ process FASTQC {
     module 'FastQC/0.11.9'
 
     input:
-    tuple val(sample_name), path(reads)
+    tuple val(meta), path(reads)
 
     output:
     path ("*.zip"), emit: zips
@@ -58,7 +58,7 @@ process FASTQC {
 
 process TRIM_GALORE {
     debug true
-    tag "trim_galore on ${sample_name}"
+    //tag "trim_galore on ${meta.sample_name}"
     // label "universal"
     cpus 4
     memory '8 GB'
@@ -68,15 +68,25 @@ process TRIM_GALORE {
     module 'fastp/0.21.0'
 
     input:
-    tuple val(sample_name), path(reads)
+    tuple val(meta), path(reads)
 
     output:
-    tuple val(sample_name), path("*.gz"), emit: trim_reads
+    tuple val(meta.sample_name), path("*.gz"), emit: trim_reads
     path("*.html")
     path("*.zip")
     path("*.txt")
 
     script:
+    if(meta.single_end) {
+    """
+    trim_galore \
+    ${reads} \
+    --cores ${task.cpus} \
+    -q 20 \
+    --fastqc \
+    --output_dir ./
+    """
+    } else {
     """
     trim_galore \
     --paired \
@@ -86,6 +96,7 @@ process TRIM_GALORE {
     --fastqc \
     --output_dir ./
     """
+    }
 }
 
 process STAR {
@@ -145,12 +156,11 @@ process SEQTK {
     tuple val(sample_name), path(reads)
 
     output:
-    tuple val(sample_name), path("${sample_name}.subsample.100000.R{1,2}.fq.gz"), emit: subsample_reads
+    tuple val(sample_name), path("${sample_name}.subsample.100000.R1.fq.gz"), emit: subsample_reads
 
     script:
     """
     seqtk sample -s 100 ${reads[0]} 100000 | gzip -c > ${sample_name}.subsample.100000.R1.fq.gz
-    seqtk sample -s 100 ${reads[1]} 100000 | gzip -c > ${sample_name}.subsample.100000.R2.fq.gz
     """
 }
 
@@ -313,17 +323,36 @@ process TPMCALCULATOR {
 log.info """
 bulkRNAseq Nextflow
 =============================================
-reads                           : ${params.reads}
+samplesheet                           : ${params.samplesheet}
 reference                       : ${params.ref_fa.(params.genome)}
 """
 
 reference = Channel.fromPath(params.ref_fa.(params.genome), checkIfExists: true)
 
+// See https://bioinformatics.stackexchange.com/questions/20227/how-does-one-account-for-both-single-end-and-paired-end-reads-as-input-in-a-next
+ch_samplesheet = Channel.fromPath(params.samplesheet, checkIfExists: true)
+
+ch_reads = ch_samplesheet.splitCsv(header:true).map {
+
+    // This is the read1 and read2 entry
+    r1 = it['fq1']
+    r2 = it['fq2']
+
+    // Detect wiether single-end or paired-end
+    is_singleEnd = r2.toString() =='' ? true : false
+
+    // The "meta" map, which is a Nextflow/Groovy map with id (the sample name) and a single_end logical entry
+    meta = [sample_name: it['sample'], single_end: is_singleEnd]
+
+    // We return a nested map, the first entry is the meta map, the second one is the read(s)
+    r2.toString()=='' ? [meta, [r1]] : [meta, [r1, r2]]
+
+}
+
 workflow {
 
-    reads_ch = Channel.fromFilePairs(params.reads, checkIfExists: true)
-    FASTQC(reads_ch)
-    TRIM_GALORE(reads_ch)
+    FASTQC(ch_reads)
+    TRIM_GALORE(ch_reads)
     SEQTK(TRIM_GALORE.out.trim_reads)
     FASTQSCREEN(SEQTK.out.subsample_reads)
     STAR(TRIM_GALORE.out.trim_reads)

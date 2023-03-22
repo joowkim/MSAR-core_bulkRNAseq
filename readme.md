@@ -3,13 +3,13 @@
 This is a standard bulkRNAseq workflow in nextflow inspired by a bulkRNAseq pipeline from BBC at VAI and scwgbs_biscuit_nf from njspix at VAI
 
 ## How to run the pipeline
-Adjust the slurm job setting and then, `sbatch run_bulkRNAseq.sh`
+Adjust the slurm job setting and then, `sbatch run_bulk_rnaseq.slurm`
 
 ## To do
-- Support `single end`
-- Include `SortMeRNA`
-- Utilize `singularity` rather than `env module`
-- Capture `command line options` for each tools
+- [x] Support `single end`
+- [x] Include `SortMeRNA`
+- [ ] Utilize `singularity` rather than `env module`
+- [ ] Capture `command line options` for each tools
 
 ## Miscellaneous
 
