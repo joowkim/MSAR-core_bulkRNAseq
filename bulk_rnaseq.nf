@@ -124,7 +124,7 @@ process STAR {
     tuple val(sample_name), path("${sample_name}._STAR*"), emit: out_dir // STARgenome and STARpass1
 
     script:
-    index = params.ref_fa.(params.genome)
+    index = params.star_index.(params.genome)
     """
     STAR \
     --runThreadN ${task.cpus} \
