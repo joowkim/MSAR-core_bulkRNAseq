@@ -72,3 +72,19 @@ information from both 5’ and 3’ ends of RNA species with stranded RNA-Seq li
 typically covers the entire sequence. A read length of 50 bp sequences most small RNAs, plus enough of the adapter to be accurately identified and trimmed during data analysis.
 
 Reference(https://knowledge.illumina.com/library-preparation/rna-library-prep/library-preparation-rna-library-prep-reference_material-list/000001243)
+
+### Designing the right experiment - How many reads do we need?
+
+The coverage is defined as:
+
+Read length * Number of reads / Length of target sequence
+
+The amount of sequencing needed for a given sample is determined by the goals of the experiment and the nature of the RNA sample.
+
+- For a general view of differential expression: 5 ~ 25M reads per sample
+- For alternative splicing and lowly expressed genes: 30 ~ 60M reads per sample
+- In-depth view of the transcriptome/assemble new transcripts: 100 ~ 200M reads
+- Targeted RNA expression requires fewer reads
+- miRNA-Seq or Small RNA Analysis require even fewer reads
+
+Reference(https://bioinformatics-core-shared-training.github.io/Bulk_RNASeq_Course_March23/Bulk_RNAseq_Course_Base/Markdowns/01_Introduction_to_RNAseq_Methods.html#6)
