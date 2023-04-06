@@ -87,4 +87,11 @@ The amount of sequencing needed for a given sample is determined by the goals of
 - Targeted RNA expression requires fewer reads
 - miRNA-Seq or Small RNA Analysis require even fewer reads
 
+#### Designing the right experiment - Read length
+
+- Gene expression -typically just a short read e.g. 50/75 bp;SE or PE
+- Kmer-based quantification of Gene Expression (Salmon etc) - benefits from PE
+- Transcriptome Analysis - longer PE reads (such as 2 x 75 bp)
+- Small RNA Analysis - short single read, e.g. SE 50 - will need trimming
+
 Reference(https://bioinformatics-core-shared-training.github.io/Bulk_RNASeq_Course_March23/Bulk_RNAseq_Course_Base/Markdowns/01_Introduction_to_RNAseq_Methods.html#6)
