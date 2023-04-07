@@ -1,6 +1,6 @@
 nextflow.enable.dsl=2
 
-process FASTQC {
+process fastqc {
     debug true
     //tag "Fastqc on ${meta.sample_name}"
     //label "universal" // getting cpu and memory usage from salmon.config - called universal
@@ -56,7 +56,7 @@ process FASTQC {
 //     """
 // }
 
-process TRIM_GALORE {
+process trim_galore {
     debug true
     //tag "trim_galore on ${meta.sample_name}"
     // label "universal"
@@ -64,8 +64,6 @@ process TRIM_GALORE {
     memory '8 GB'
 
     publishDir "${projectDir}/analysis/trim_galore/"
-
-    module 'fastp/0.21.0'
 
     input:
     tuple val(meta), path(reads)
@@ -99,7 +97,7 @@ process TRIM_GALORE {
     }
 }
 
-process STAR {
+process star {
     debug true
     tag "STAR on ${sample_name}"
     // label "universal"
@@ -141,7 +139,7 @@ process STAR {
     """
 }
 
-process SEQTK {
+process seqtk {
     debug true
     tag "seqtk on ${sample_name}"
 
@@ -164,7 +162,7 @@ process SEQTK {
     """
 }
 
- process SORTMERNA {
+ process sortMeRNA {
      debug true
      tag "SortMeRNA on ${sample_name}"
 
@@ -208,7 +206,7 @@ process SEQTK {
 }
 
 
-process MULTIQC {
+process multiqc {
     debug true
     tag "Multiqc on this project"
 
@@ -231,7 +229,7 @@ process MULTIQC {
     """
 }
 
-process QUALIMAP {
+process qualimap {
     debug true
     tag "Qualimap on ${sample_name}"
 
@@ -260,7 +258,7 @@ process QUALIMAP {
     """
 }
 
-process FASTQSCREEN {
+process fastq_screen {
     debug true
     tag "Fastq-screen on ${sample_name}"
 
@@ -290,7 +288,7 @@ process FASTQSCREEN {
     """
 }
 
-process TPMCALCULATOR {
+process tpm_calculator {
     debug true
     tag "tpm_calculator on ${sample_name}"
 
@@ -351,15 +349,15 @@ ch_reads = ch_samplesheet.splitCsv(header:true).map {
 
 workflow {
 
-    FASTQC(ch_reads)
-    TRIM_GALORE(ch_reads)
-    SEQTK(TRIM_GALORE.out.trim_reads)
-    FASTQSCREEN(SEQTK.out.subsample_reads)
-    STAR(TRIM_GALORE.out.trim_reads)
-    SORTMERNA(SEQTK.out.subsample_reads)
-    QUALIMAP(STAR.out.bam)
-    TPMCALCULATOR(STAR.out.bam)
-    MULTIQC( QUALIMAP.out.qualimap_out.mix(SORTMERNA.out.sortMeRNA_out).collect() )
+    fastqc(ch_reads)
+    trim_galore(ch_reads)
+    seqtk(trim_galore.out.trim_reads)
+    fastq_screen(seqtk.out.subsample_reads)
+    star(trim_galore.out.trim_reads)
+    sortMeRNA(seqtk.out.subsample_reads)
+    qualimap(star.out.bam)
+    tpm_calculator(STAR.out.bam)
+    multiqc( qualimap.out.qualimap_out.mix(sortMeRNA.out.sortMeRNA_out).collect() )
 
 }
 
