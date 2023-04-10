@@ -1,11 +1,11 @@
 nextflow.enable.dsl=2
 
 process fastqc {
-    debug true
-    //tag "Fastqc on ${meta.sample_name}"
-    //label "universal" // getting cpu and memory usage from salmon.config - called universal
+    //debug true
+    tag "Fastqc on ${meta.sample_name}"
     cpus 8
     memory '4 GB'
+    time "2h"
 
     publishDir "${projectDir}/analysis/fastqc/"
 
@@ -57,11 +57,11 @@ process fastqc {
 // }
 
 process trim_galore {
-    debug true
-    //tag "trim_galore on ${meta.sample_name}"
-    // label "universal"
+    //debug true
+    tag "trim_galore on ${meta.sample_name}"
     cpus 4
     memory '8 GB'
+    time "2h"
 
     publishDir "${projectDir}/analysis/trim_galore/"
 
@@ -98,11 +98,11 @@ process trim_galore {
 }
 
 process star {
-    debug true
+    //debug true
     tag "STAR on ${sample_name}"
-    // label "universal"
     cpus 8
     memory '64 GB'
+    time "3h"
 
     publishDir "${projectDir}/analysis/star/", mode : "copy"
 
@@ -140,11 +140,12 @@ process star {
 }
 
 process seqtk {
-    debug true
+    //debug true
     tag "seqtk on ${sample_name}"
+    time "2h"
 
     cpus 2
-    memory '8 GB'
+    memory '4 GB'
 
     publishDir "${projectDir}/analysis/seqtk/"
 
@@ -165,6 +166,7 @@ process seqtk {
  process sortMeRNA {
      debug true
      tag "SortMeRNA on ${sample_name}"
+     time "2h"
 
      cpus 8
      memory '8 GB'
@@ -207,8 +209,9 @@ process seqtk {
 
 
 process multiqc {
-    debug true
-    tag "Multiqc on this project"
+    //debug true
+    tag "Multiqc on the project"
+    time "1h"
 
     cpus 1
     memory '4 GB'
@@ -230,8 +233,9 @@ process multiqc {
 }
 
 process qualimap {
-    debug true
+    //debug true
     tag "Qualimap on ${sample_name}"
+    time "3h"
 
     cpus 8
     memory '8 GB'
@@ -259,8 +263,9 @@ process qualimap {
 }
 
 process fastq_screen {
-    debug true
+    //debug true
     tag "Fastq-screen on ${sample_name}"
+    time "2h"
 
     cpus 4
     memory '8 GB'
@@ -289,8 +294,9 @@ process fastq_screen {
 }
 
 process tpm_calculator {
-    debug true
+    //debug true
     tag "tpm_calculator on ${sample_name}"
+    time "2h"
 
     cpus 4
     memory '8 GB'
@@ -356,7 +362,7 @@ workflow {
     star(trim_galore.out.trim_reads)
     sortMeRNA(seqtk.out.subsample_reads)
     qualimap(star.out.bam)
-    tpm_calculator(STAR.out.bam)
+    tpm_calculator(star.out.bam)
     multiqc( qualimap.out.qualimap_out.mix(sortMeRNA.out.sortMeRNA_out).collect() )
 
 }
