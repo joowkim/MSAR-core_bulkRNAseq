@@ -122,7 +122,7 @@ process star {
     tuple val(sample_name), path("${sample_name}._STAR*"), emit: out_dir // STARgenome and STARpass1
 
     script:
-    index = params.star_index.(params.genome)
+    def index = params.star_index.(params.genome)
     """
     STAR \
     --runThreadN ${task.cpus} \
@@ -182,15 +182,15 @@ process seqtk {
      path ("*"), emit: sortMeRNA_out
 
      script:
-     idx = "/mnt/beegfs/kimj32/tools/sortmerna/idx"
-     rfam5_8s = "/home/kimj32/beegfs/tools/sortmerna/data/rRNA_databases/rfam-5.8s-database-id98.fasta"
-     rfam5s = "/home/kimj32/beegfs/tools/sortmerna/data/rRNA_databases/rfam-5s-database-id98.fasta"
-     silva_arc_16s = "/home/kimj32/beegfs/tools/sortmerna/data/rRNA_databases/silva-arc-16s-id95.fasta"
-     silva_arc_23s = "/home/kimj32/beegfs/tools/sortmerna/data/rRNA_databases/silva-arc-23s-id98.fasta"
-     silva_euk_18s = "/home/kimj32/beegfs/tools/sortmerna/data/rRNA_databases/silva-euk-18s-id95.fasta"
-     silva_euk_28s = "/home/kimj32/beegfs/tools/sortmerna/data/rRNA_databases/silva-euk-28s-id98.fasta"
-     silva_bac_16s = "/home/kimj32/beegfs/tools/sortmerna/data/rRNA_databases/silva-bac-16s-id90.fasta"
-     silva_bac_23s = "/home/kimj32/beegfs/tools/sortmerna/data/rRNA_databases/silva-bac-23s-id98.fasta"
+     def idx = "/mnt/beegfs/kimj32/tools/sortmerna/idx"
+     def rfam5_8s = "/home/kimj32/beegfs/tools/sortmerna/data/rRNA_databases/rfam-5.8s-database-id98.fasta"
+     def rfam5s = "/home/kimj32/beegfs/tools/sortmerna/data/rRNA_databases/rfam-5s-database-id98.fasta"
+     def silva_arc_16s = "/home/kimj32/beegfs/tools/sortmerna/data/rRNA_databases/silva-arc-16s-id95.fasta"
+     def silva_arc_23s = "/home/kimj32/beegfs/tools/sortmerna/data/rRNA_databases/silva-arc-23s-id98.fasta"
+     def silva_euk_18s = "/home/kimj32/beegfs/tools/sortmerna/data/rRNA_databases/silva-euk-18s-id95.fasta"
+     def silva_euk_28s = "/home/kimj32/beegfs/tools/sortmerna/data/rRNA_databases/silva-euk-28s-id98.fasta"
+     def silva_bac_16s = "/home/kimj32/beegfs/tools/sortmerna/data/rRNA_databases/silva-bac-16s-id90.fasta"
+     def silva_bac_23s = "/home/kimj32/beegfs/tools/sortmerna/data/rRNA_databases/silva-bac-23s-id98.fasta"
      """
      sortmerna --threads ${task.cpus} \
      -reads ${reads[0]} \
@@ -252,10 +252,10 @@ process qualimap {
     path("*"), emit: qualimap_out
 
     script:
+    def gtf = params.gtf.(params.genome)
     // if sample is paired end data
     if ( sample_name == meta.sample_name ) {
         if ( !meta.single_end ) {
-            gtf = params.gtf.(params.genome)
             """
             qualimap rnaseq -bam ${bam} \
             -gtf ${gtf} \
@@ -266,7 +266,6 @@ process qualimap {
             """
         } else {
             // if sample is single end data
-        gtf = params.gtf.(params.genome)
         """
         qualimap rnaseq -bam ${bam} \
         -gtf ${gtf} \
@@ -300,7 +299,7 @@ process fastq_screen {
 
     // threads option is already defined in fastq_screeN_conf
     script:
-    conf = params.fastq_screen_conf
+    def conf = params.fastq_screen_conf
     """
     fastq_screen --aligner bowtie2 \
     --conf ${conf} \
@@ -329,7 +328,7 @@ process tpm_calculator {
 
     script:
     // -p option is for paired end data
-    gtf = params.gtf.(params.genome)
+    def gtf = params.gtf.(params.genome)
     """
     TPMCalculator -g ${gtf} \
     -b ${bam_file} \
