@@ -164,7 +164,7 @@ process seqtk {
 }
 
  process sortMeRNA {
-     debug true
+     //debug true
      tag "SortMeRNA on ${sample_name}"
      time "2h"
 
@@ -246,21 +246,37 @@ process qualimap {
 
     input:
     tuple val(sample_name), path(bam)
+    tuple val(meta), path(reads)
 
     output:
     path("*"), emit: qualimap_out
 
     script:
-    gtf = params.gtf.(params.genome)
-    """
-    qualimap rnaseq -bam ${bam} \
-    -gtf ${gtf} \
-    --paired \
-    -outdir quailmap_${sample_name} \
-    --java-mem-size=6G \
-    --sequencing-protocol strand-specific-reverse
-    """
-}
+    // if sample is paired end data
+    if ( sample_name == meta.sample_name ) {
+        if ( !meta.single_end ) {
+            gtf = params.gtf.(params.genome)
+            """
+            qualimap rnaseq -bam ${bam} \
+            -gtf ${gtf} \
+            --paired \
+            -outdir quailmap_${sample_name} \
+            --java-mem-size=6G \
+            --sequencing-protocol strand-specific-reverse
+            """
+        } else {
+            // if sample is single end data
+        gtf = params.gtf.(params.genome)
+        """
+        qualimap rnaseq -bam ${bam} \
+        -gtf ${gtf} \
+        -outdir quailmap_${sample_name} \
+        --java-mem-size=6G \
+        --sequencing-protocol strand-specific-reverse
+        """
+        } // end the nested if else
+    } // end if
+} // end process
 
 process fastq_screen {
     //debug true
@@ -361,7 +377,7 @@ workflow {
     fastq_screen(seqtk.out.subsample_reads)
     star(trim_galore.out.trim_reads)
     sortMeRNA(seqtk.out.subsample_reads)
-    qualimap(star.out.bam)
+    qualimap(star.out.bam, ch_reads)
     tpm_calculator(star.out.bam)
     multiqc( qualimap.out.qualimap_out.mix(sortMeRNA.out.sortMeRNA_out).collect() )
 

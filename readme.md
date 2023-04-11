@@ -5,12 +5,6 @@ This is a standard bulkRNAseq workflow in nextflow inspired by a bulkRNAseq pipe
 ## How to run the pipeline
 Adjust the slurm job setting and then, `sbatch run_bulk_rnaseq.slurm`
 
-## To do
-- [x] Support `single end`
-- [x] Include `SortMeRNA`
-- [ ] Utilize `singularity` rather than `env module`
-- [ ] Capture `command line options` for each tools
-
 ## Miscellaneous
 
 ### General guidelines for bulkRNAseq analysis
@@ -95,3 +89,9 @@ The amount of sequencing needed for a given sample is determined by the goals of
 - Small RNA Analysis - short single read, e.g. SE 50 - will need trimming
 
 Reference(https://bioinformatics-core-shared-training.github.io/Bulk_RNASeq_Course_March23/Bulk_RNAseq_Course_Base/Markdowns/01_Introduction_to_RNAseq_Methods.html#6)
+
+## To do
+- [x] Support `single end`
+- [x] Include `SortMeRNA`
+- [ ] Utilize `singularity` rather than `env module`
+- [ ] Capture `command line options` for each tools
