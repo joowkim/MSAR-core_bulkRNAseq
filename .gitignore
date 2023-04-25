@@ -141,3 +141,7 @@ cython_debug/
 .idea/
 *.gz
 questions_for_vlad.md
+
+.DS_Store
+
+rawdata/
