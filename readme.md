@@ -1,6 +1,6 @@
 # bulkRNAseq in nextflow
 
-This is a standard bulkRNAseq workflow in nextflow inspired by a bulkRNAseq pipeline from BBC at VAI and scwgbs_biscuit_nf from njspix at VAI
+This is a standard bulkRNAseq workflow in nextflow inspired by a bulkRNAseq pipeline from BBC at VAI and scwgbs_biscuit_nf from njspix at VAI. Many lines of code are adapted from them.
 
 ## How to run the pipeline
 Adjust the slurm job setting and then, `sbatch run_bulk_rnaseq.slurm`
