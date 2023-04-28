@@ -100,8 +100,8 @@ process trim_galore {
 process star {
     //debug true
     tag "STAR on ${sample_name}"
-    cpus 8
-    memory '64 GB'
+    cpus 12
+    memory '48 GB'
     time "3h"
 
     publishDir "${projectDir}/analysis/star/", mode : "copy"
@@ -122,7 +122,7 @@ process star {
     tuple val(sample_name), path("${sample_name}._STAR*"), emit: out_dir // STARgenome and STARpass1
 
     script:
-    def index = params.star_index.(params.genome)
+    index = params.star_index.(params.genome)
     """
     STAR \
     --runThreadN ${task.cpus} \
@@ -136,6 +136,40 @@ process star {
     --outStd Log 2> ${sample_name}.log \
 
     samtools index "${sample_name}.Aligned.sortedByCoord.out.bam"
+    """
+}
+
+process salmon {
+    debug true
+    tag "running salmon on ${sample_name}"
+    time "2h"
+
+    cpus 12
+    memory '16 GB'
+
+    module "salmon/1.9"
+    publishDir "${projectDir}/analysis/salmon/"
+
+    input:
+    tuple val(sample_name), path(reads)
+
+    output:
+    path("${sample_name}"), emit: salmon_out
+
+    script:
+    // this is adapted from https://github.com/ATpoint/rnaseq_preprocess/blob/99e3d9b556325d2619e6b28b9531bf97a1542d3d/modules/quant.nf#L29
+    def add_gcBias = meta.single_end ? "" : "--gcBias "
+    def use_reads = meta.single_end ? "-r $reads" : "-1 ${reads[0]} -2 ${reads[1]}"
+    index = params.salmon_index.(params.genome)
+    """
+    salmon quant \
+        -p ${task.cpus} \
+        -l A \
+        -i ${index} \
+        $use_reads \
+        $add_gcBias \
+        --validateMappings \
+        -o ${sample_name}
     """
 }
 
@@ -252,7 +286,7 @@ process qualimap {
     path("*"), emit: qualimap_out
 
     script:
-    def gtf = params.gtf.(params.genome)
+    gtf = params.gtf.(params.genome)
     // if sample is paired end data
     if ( sample_name == meta.sample_name ) {
         if ( !meta.single_end ) {
@@ -351,6 +385,7 @@ reference = Channel.fromPath(params.ref_fa.(params.genome), checkIfExists: true)
 // See https://bioinformatics.stackexchange.com/questions/20227/how-does-one-account-for-both-single-end-and-paired-end-reads-as-input-in-a-next
 ch_samplesheet = Channel.fromPath(params.samplesheet, checkIfExists: true)
 
+// adapted from https://bioinformatics.stackexchange.com/questions/20227/how-does-one-account-for-both-single-end-and-paired-end-reads-as-input-in-a-next
 ch_reads = ch_samplesheet.splitCsv(header:true).map {
 
     // This is the read1 and read2 entry
@@ -378,8 +413,13 @@ workflow {
     sortMeRNA(seqtk.out.subsample_reads)
     qualimap(star.out.bam, ch_reads)
     tpm_calculator(star.out.bam)
-    multiqc( qualimap.out.qualimap_out.mix(sortMeRNA.out.sortMeRNA_out).collect() )
 
+    if (params.run_salmon) {
+        salmon(trim_galore.out.trim_reads)
+        multiqc(qualimap.out.qualimap_out.mix(sortMeRNA.out.sortMeRNA_out, salmon.out.salmon_out).collect())
+    } else {
+        multiqc( qualimap.out.qualimap_out.mix(sortMeRNA.out.sortMeRNA_out).collect() )
+    }
 }
 
 workflow.onComplete {

@@ -44,3 +44,6 @@ workflow {
 workflow.onComplete {
 	println ( workflow.success ? "\nDone!" : "Oops .. something went wrong" )
 }
+
+// how to run
+// nextflow run this.nf --raw_data_dir "some_path"
