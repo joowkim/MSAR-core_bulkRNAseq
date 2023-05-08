@@ -1,4 +1,5 @@
 import argparse
+import io
 import logging
 import os
 import re
@@ -6,43 +7,52 @@ from collections import OrderedDict, defaultdict
 from dataclasses import dataclass
 from typing import List, Dict, DefaultDict
 
+import pandas as pd
+
 logging.basicConfig(level=logging.DEBUG,
                     format=' %(asctime)s - %(levelname)s- %(message)s')
 
 
-def read_sample_sheet(sample_sheet: str) -> OrderedDict[str, str]:
+def read_sample_sheet(sample_sheet: str) -> Dict[str, str]:
     """
 
     :param sample_sheet:
     :return: result_dict: key - sample_name, value = sample_id
     """
-    result_dict: OrderedDict[str, str] = OrderedDict()
+    string_out = io.StringIO()
+    result_dict: Dict[str, str] = dict()
     assert os.path.isfile(sample_sheet), f"{sample_sheet} is not found!"
 
     with open(sample_sheet) as fin:
         flag: bool = False  # this is for not including the columns - Sample_ID,Sample_Name ...
         for line in fin:
-            if "Sample_ID" in line:
+            if "Sample_Name" in line:
                 flag: bool = True
+                string_out.write(line)
                 # don't include the columns - Sample_ID,Sample_Name...
                 line: str = fin.readline()
 
-            if flag:
+            if flag and not line.startswith(","):
+                string_out.write(line)
                 # line looks like this
                 # Sample_ID,Sample_Name,Sample_Plate,Sample_Well,Index_Plate_Well,I7_Index_ID,index,I5_Index_ID,index2,Sample_Project,Description
                 # WGS1,GC-LX-1434_1,,,,,TAAGGCGA,,AGAGGATA,GC-LX-1434,
-                tmp_line_list: List[str] = line.split(",")
-                sample_id: str = tmp_line_list[0]
-                sample_name: str = tmp_line_list[1]
 
-                if sample_id in result_dict:
-                    print(f"duplicated sample_id found - {sample_id} in {sample_sheet}")
-                    raise ValueError
-                elif sample_name in result_dict:
-                    print(f"duplicated sample_name found - {sample_name} in {sample_sheet}")
-                    raise ValueError
-                else:
-                    result_dict[sample_name] = sample_id
+    string_out.seek(0)
+
+    df: pd.DataFrame = pd.read_csv(string_out)
+    df_col: List[str] = df.columns
+    if "Submitted_Name" in df_col and "Sample_Name" in df_col:
+        result_dict: Dict = dict(zip(df.Sample_Name, df.Submitted_Name))
+    elif "Sample_ID" in df_col and "Sample_Name" in df_col:
+        result_dict: Dict = dict(zip(df.Sample_Name, df.Sample_ID))
+    else:
+        print("Samplesheet seems weird. check it out.")
+        print(f"{sample_sheet}")
+        print(df)
+        raise ValueError
+
+    string_out.close()
     return result_dict
 
 
@@ -63,7 +73,7 @@ def get_fq_path(fastq_dir: str) -> Dict[str, List[str]]:
                 assert os.path.isfile(abs_path), f"{abs_path} is not valid!"
 
                 # get the prefix of the name of fastq files
-                file_name: str = re.sub("_S[\d]+_L00[1-4]_R[1-3]_00[1-2].fastq.gz", "", fq)
+                file_name: str = re.sub("_S[\d]+_L00[1-4]_[I-R][1-3]_00[1-2].fastq.gz", "", fq)
 
                 if file_name.endswith("fastq.gz"):
                     file_name: str = re.sub("_R[1-3].fastq.gz", "", fq)
@@ -124,9 +134,10 @@ def rename(fq_path_dict: Dict, dry_run: bool, fq_path_for_log_file: str):
     log_file_path:str = os.path.join(fq_path_for_log_file, log_file_prefix)
 
     if dry_run:
+        logging.info(f"this is a dry run.")
         for ori_path in fq_path_dict:
             new_path: str = fq_path_dict.get(ori_path)
-            logging.info(f"this is a dry run. rename {ori_path} -> {new_path}.")
+            logging.info(f"rename {ori_path} -> {new_path}.")
     else:
         with open(log_file_path, 'w') as fout:
             fout.write('original_name,new_name\n')

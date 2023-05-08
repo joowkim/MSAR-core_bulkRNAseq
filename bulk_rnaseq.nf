@@ -2,7 +2,7 @@ nextflow.enable.dsl=2
 
 process fastqc {
     //debug true
-    tag "Fastqc on ${meta.sample_name}"
+    tag "${meta.sample_name}"
     cpus 8
     memory '4 GB'
     time "2h"
@@ -19,14 +19,15 @@ process fastqc {
     path ("*.html"), emit: htmls
 
     script:
+    def threads = task.cpus - 1
     """
-    fastqc --threads ${task.cpus} ${reads}
+    fastqc --threads ${threads} ${reads}
     """
 }
 
 // process FASTP {
 //     debug true
-//     tag "Fastp on ${sample_name}"
+//     tag "${sample_name}"
 //     // label "universal"
 //     cpus 8
 //     memory '8 GB'
@@ -58,7 +59,7 @@ process fastqc {
 
 process trim_galore {
     //debug true
-    tag "trim_galore on ${meta.sample_name}"
+    tag "${meta.sample_name}"
     cpus 4
     memory '8 GB'
     time "2h"
@@ -69,17 +70,19 @@ process trim_galore {
     tuple val(meta), path(reads)
 
     output:
-    tuple val(meta.sample_name), path("*.gz"), emit: trim_reads
+    tuple val(meta.sample_name), path("*.gz"), val(meta.single_end), emit: trim_reads
     path("*.html")
     path("*.zip")
     path("*.txt")
 
     script:
-    if(meta.single_end) {
+    def threads = task.cpus - 1
+    if(!meta.single_end) {
     """
     trim_galore \
+    --paired \
     ${reads} \
-    --cores ${task.cpus} \
+    --cores ${threads} \
     -q 20 \
     --fastqc \
     --output_dir ./
@@ -87,7 +90,6 @@ process trim_galore {
     } else {
     """
     trim_galore \
-    --paired \
     ${reads[0]} ${reads[1]} \
     --cores ${task.cpus} \
     -q 20 \
@@ -99,9 +101,9 @@ process trim_galore {
 
 process star {
     //debug true
-    tag "STAR on ${sample_name}"
+    tag "${sample_name}"
     cpus 12
-    memory '48 GB'
+    memory '42 GB'
     time "3h"
 
     publishDir "${projectDir}/analysis/star/", mode : "copy"
@@ -110,10 +112,10 @@ process star {
     module 'samtools/1.16.1'
 
     input:
-    tuple val(sample_name), path(reads)
+    tuple val(sample_name), path(reads), val(is_SE)
 
     output:
-    tuple val(sample_name), path("${sample_name}.Aligned.sortedByCoord.out.bam"), emit: bam
+    tuple val(sample_name), path("${sample_name}.Aligned.sortedByCoord.out.bam"), val(is_SE), emit: bam
     tuple val(sample_name), path("${sample_name}.Aligned.sortedByCoord.out.bam.bai"), emit: bai
     tuple val(sample_name), path("${sample_name}.Log.final.out"), emit: log_final
     tuple val(sample_name), path("${sample_name}.Log.out"), emit: log_out
@@ -123,9 +125,10 @@ process star {
 
     script:
     index = params.star_index.(params.genome)
+    def threads = task.cpus - 1
     """
     STAR \
-    --runThreadN ${task.cpus} \
+    --runThreadN ${threads} \
     --genomeDir ${index} \
     --readFilesIn ${reads} \
     --twopassMode Basic \
@@ -139,31 +142,76 @@ process star {
     """
 }
 
+process qualimap {
+    //debug true
+    tag "${sample_name}"
+    time "4h"
+
+    cpus 8
+    memory '16 GB'
+
+    publishDir "${projectDir}/analysis/qualimap/"
+
+    module 'qualimap/2.2.1'
+
+    input:
+    tuple val(sample_name), path(bam), val(is_SE)
+
+    output:
+    path("*"), emit: qualimap_out
+
+    script:
+    gtf = params.gtf.(params.genome)
+
+    if ( ! is_SE ) {
+        // if sample is paired end data
+        """
+        qualimap rnaseq -bam ${bam} \
+        -gtf ${gtf} \
+        --paired \
+        -outdir quailmap_${sample_name} \
+        --java-mem-size=6G \
+        --sequencing-protocol strand-specific-reverse
+        """
+    } else {
+        // if sample is single end data
+        """
+        qualimap rnaseq -bam ${bam} \
+        -gtf ${gtf} \
+        -outdir quailmap_${sample_name} \
+        --java-mem-size=6G \
+        --sequencing-protocol strand-specific-reverse
+        """
+    } // end if else
+} // end process
+
 process salmon {
     debug true
-    tag "running salmon on ${sample_name}"
-    time "2h"
+    tag "${sample_name}"
+    time "3h"
 
     cpus 12
-    memory '16 GB'
+    memory '8 GB'
 
     module "salmon/1.9"
     publishDir "${projectDir}/analysis/salmon/"
 
     input:
-    tuple val(sample_name), path(reads)
+    tuple val(sample_name), path(reads), val(is_SE)
 
     output:
     path("${sample_name}"), emit: salmon_out
 
     script:
+    def threads = task.cpus - 1
     // this is adapted from https://github.com/ATpoint/rnaseq_preprocess/blob/99e3d9b556325d2619e6b28b9531bf97a1542d3d/modules/quant.nf#L29
-    def add_gcBias = meta.single_end ? "" : "--gcBias "
-    def use_reads = meta.single_end ? "-r $reads" : "-1 ${reads[0]} -2 ${reads[1]}"
+    def is_paired = is_SE ? "single" : "paired"
+    def add_gcBias = is_SE ? "" : "--gcBias "
+    def use_reads = is_SE ? "-r ${reads}" : "-1 ${reads[0]} -2 ${reads[1]}"
     index = params.salmon_index.(params.genome)
     """
     salmon quant \
-        -p ${task.cpus} \
+        -p $threads \
         -l A \
         -i ${index} \
         $use_reads \
@@ -175,7 +223,7 @@ process salmon {
 
 process seqtk {
     //debug true
-    tag "seqtk on ${sample_name}"
+    tag "${sample_name}"
     time "2h"
 
     cpus 2
@@ -199,7 +247,7 @@ process seqtk {
 
  process sortMeRNA {
      //debug true
-     tag "SortMeRNA on ${sample_name}"
+     tag "${sample_name}"
      time "2h"
 
      cpus 8
@@ -216,6 +264,7 @@ process seqtk {
      path ("*"), emit: sortMeRNA_out
 
      script:
+     def threads = task.cpus - 1
      def idx = "/mnt/beegfs/kimj32/tools/sortmerna/idx"
      def rfam5_8s = "/home/kimj32/beegfs/tools/sortmerna/data/rRNA_databases/rfam-5.8s-database-id98.fasta"
      def rfam5s = "/home/kimj32/beegfs/tools/sortmerna/data/rRNA_databases/rfam-5s-database-id98.fasta"
@@ -226,7 +275,7 @@ process seqtk {
      def silva_bac_16s = "/home/kimj32/beegfs/tools/sortmerna/data/rRNA_databases/silva-bac-16s-id90.fasta"
      def silva_bac_23s = "/home/kimj32/beegfs/tools/sortmerna/data/rRNA_databases/silva-bac-23s-id98.fasta"
      """
-     sortmerna --threads ${task.cpus} \
+     sortmerna --threads ${threads} \
      -reads ${reads[0]} \
      --workdir sortMeRNA_${sample_name}  \
      --idx-dir ${idx}  \
@@ -241,79 +290,9 @@ process seqtk {
      """
 }
 
-
-process multiqc {
-    //debug true
-    tag "Multiqc on the project"
-    time "1h"
-
-    cpus 1
-    memory '4 GB'
-
-    publishDir "${projectDir}/analysis/multiqc/", mode : "copy"
-
-    module 'python/3.6.2'
-
-    input:
-    path(files)
-
-    output:
-    path("*.html"), emit: multiqc_output
-
-    script:
-    """
-    multiqc ${projectDir}/analysis --filename "multiqc_report.html" --ignore '*STARpass1'
-    """
-}
-
-process qualimap {
-    //debug true
-    tag "Qualimap on ${sample_name}"
-    time "3h"
-
-    cpus 8
-    memory '8 GB'
-
-    publishDir "${projectDir}/analysis/qualimap/"
-
-    module 'qualimap/2.2.1'
-
-    input:
-    tuple val(sample_name), path(bam)
-    tuple val(meta), path(reads)
-
-    output:
-    path("*"), emit: qualimap_out
-
-    script:
-    gtf = params.gtf.(params.genome)
-    // if sample is paired end data
-    if ( sample_name == meta.sample_name ) {
-        if ( !meta.single_end ) {
-            """
-            qualimap rnaseq -bam ${bam} \
-            -gtf ${gtf} \
-            --paired \
-            -outdir quailmap_${sample_name} \
-            --java-mem-size=6G \
-            --sequencing-protocol strand-specific-reverse
-            """
-        } else {
-            // if sample is single end data
-        """
-        qualimap rnaseq -bam ${bam} \
-        -gtf ${gtf} \
-        -outdir quailmap_${sample_name} \
-        --java-mem-size=6G \
-        --sequencing-protocol strand-specific-reverse
-        """
-        } // end the nested if else
-    } // end if
-} // end process
-
 process fastq_screen {
     //debug true
-    tag "Fastq-screen on ${sample_name}"
+    tag "${sample_name}"
     time "2h"
 
     cpus 4
@@ -342,27 +321,53 @@ process fastq_screen {
     """
 }
 
+process multiqc {
+    //debug true
+    //tag "Multiqc on the project"
+    time "1h"
+
+    cpus 1
+    memory '4 GB'
+
+    publishDir "${projectDir}/analysis/multiqc/", mode : "copy"
+
+    module 'python/3.6.2'
+
+    input:
+    path(files)
+
+    output:
+    path("*.html"), emit: multiqc_output
+
+    script:
+    """
+    multiqc ${projectDir}/analysis --filename "multiqc_report.html" --ignore '*STARpass1'
+    """
+}
+
 process tpm_calculator {
     //debug true
     tag "tpm_calculator on ${sample_name}"
-    time "2h"
+    time "6h"
 
-    cpus 4
-    memory '8 GB'
+    cpus 8
+    memory '16 GB'
 
     publishDir "${projectDir}/analysis/tpm_calculator/"
 
     module "TPMCalculator/0.4.0"
 
     input:
-    tuple val(sample_name), path(bam_file)
+    tuple val(sample_name), path(bam_file), val(is_SE)
 
     output:
     path("*out"), emit : "tpm_calculator_out"
 
     script:
     // -p option is for paired end data
-    def gtf = params.gtf.(params.genome)
+    gtf = params.gtf.(params.genome)
+
+    if ( ! is_SE ) {
     """
     TPMCalculator -g ${gtf} \
     -b ${bam_file} \
@@ -370,6 +375,14 @@ process tpm_calculator {
 
     /home/kimj32/basic-tools/renamer 's/.Aligned.sortedByCoord.out_genes//' *out_genes*
     """
+    } else {
+    """
+    TPMCalculator -g ${gtf} \
+    -b ${bam_file} \
+
+    /home/kimj32/basic-tools/renamer 's/.Aligned.sortedByCoord.out_genes//' *out_genes*
+    """
+    }
 }
 
 
@@ -411,14 +424,18 @@ workflow {
     fastq_screen(seqtk.out.subsample_reads)
     star(trim_galore.out.trim_reads)
     sortMeRNA(seqtk.out.subsample_reads)
-    qualimap(star.out.bam, ch_reads)
-    tpm_calculator(star.out.bam)
+    star.out.bam.view()
+    qualimap(star.out.bam)
 
     if (params.run_salmon) {
         salmon(trim_galore.out.trim_reads)
         multiqc(qualimap.out.qualimap_out.mix(sortMeRNA.out.sortMeRNA_out, salmon.out.salmon_out).collect())
     } else {
         multiqc( qualimap.out.qualimap_out.mix(sortMeRNA.out.sortMeRNA_out).collect() )
+    }
+
+    if (params.run_tpm_calculator) {
+        tpm_calculator(star.out.bam)
     }
 }
 
