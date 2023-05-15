@@ -90,7 +90,7 @@ process trim_galore {
     } else {
     """
     trim_galore \
-    ${reads[0]} ${reads[1]} \
+    ${reads[0]} \
     --cores ${task.cpus} \
     -q 20 \
     --fastqc \
@@ -234,7 +234,7 @@ process seqtk {
     module 'seqtk/1.3'
 
     input:
-    tuple val(sample_name), path(reads)
+    tuple val(sample_name), path(reads), val(is_SE)
 
     output:
     tuple val(sample_name), path("${sample_name}.subsample.100000.R1.fq.gz"), emit: subsample_reads
@@ -353,8 +353,12 @@ process tpm_calculator {
     cpus 8
     memory '16 GB'
 
-    publishDir "${projectDir}/analysis/tpm_calculator/"
-
+    publishDir (
+        path: "${projectDir}/analysis/tpm_calculator/",
+        saveAs: {
+            fn -> fn.replaceAll(".Aligned.sortedByCoord.out_genes", "")
+        }
+    )
     module "TPMCalculator/0.4.0"
 
     input:
@@ -372,15 +376,11 @@ process tpm_calculator {
     TPMCalculator -g ${gtf} \
     -b ${bam_file} \
     -p
-
-    /home/kimj32/basic-tools/renamer 's/.Aligned.sortedByCoord.out_genes//' *out_genes*
     """
     } else {
     """
     TPMCalculator -g ${gtf} \
     -b ${bam_file} \
-
-    /home/kimj32/basic-tools/renamer 's/.Aligned.sortedByCoord.out_genes//' *out_genes*
     """
     }
 }
