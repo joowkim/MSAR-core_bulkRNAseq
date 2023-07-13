@@ -1,7 +1,7 @@
 nextflow.enable.dsl=2
 
 process fastqc {
-    //debug true
+    debug true
     tag "${meta.sample_name}"
     cpus 8
     memory '4 GB'
@@ -19,45 +19,59 @@ process fastqc {
     path ("*.html"), emit: htmls
 
     script:
-    def threads = task.cpus - 1
     """
-    fastqc --threads ${threads} ${reads}
+    fastqc --threads ${task.cpus} ${reads}
     """
 }
 
-// process FASTP {
-//     debug true
-//     tag "${sample_name}"
-//     // label "universal"
-//     cpus 8
-//     memory '8 GB'
-//
-//     publishDir "${projectDir}/analysis/fastp/"
-//
-//     module 'fastp/0.21.0'
-//
-//     input:
-//     tuple val(sample_name), path(reads)
-//
-//     output:
-//     tuple val(sample_name), path("${sample_name}_trimmed.R{1,2}.fq.gz"), emit: trim_reads
-//     path("${sample_name}.fastp.json"), emit: json
-//
-//     script:
-//     """
-//     fastp \
-//     -i ${reads[0]} \
-//     -I ${reads[1]} \
-//     --thread ${task.cpus} \
-//     --detect_adapter_for_pe \
-//     --qualified_quality_phred 25 \
-//     -o ${sample_name}_trimmed.R1.fq.gz \
-//     -O ${sample_name}_trimmed.R2.fq.gz \
-//     --json ${sample_name}.fastp.json
-//     """
-// }
+process fastp {
+    debug true
+    tag "${meta.sample_name}"
+    // label "universal"
+    cpus 8
+    memory '8 GB'
 
-process trim_galore {
+    publishDir "${launchDir}/analysis/fastp/", mode: "copy"
+
+    module 'fastp/0.21.0'
+
+    input:
+    tuple val(meta), path(reads)
+
+    output:
+    tuple val(meta.sample_name), path("${meta.sample_name}_trimmed_R*.fastq.gz"), val(meta.single_end), emit: trim_reads
+    path("${meta.sample_name}.fastp.json"), emit: json
+
+    script:
+    def adapter = "/mnt/beegfs/kimj32/reference/adapters.fa"
+    if(!meta.single_end) {
+        """
+        fastp \
+        -i ${reads[0]} \
+        -I ${reads[1]} \
+        --thread ${task.cpus} \
+        --trim_poly_g \
+        --qualified_quality_phred 20 \
+        -o ${meta.sample_name}_trimmed_R1.fastq.gz \
+        -O ${meta.sample_name}_trimmed_R2.fastq.gz \
+        --adapter_fasta $adapter \
+        --json ${meta.sample_name}.fastp.json
+        """
+    } else {
+        """
+        fastp \
+        -i ${reads} \
+        --thread ${task.cpus} \
+        --trim_poly_g \
+        --qualified_quality_phred 20 \
+        -o ${meta.sample_name}_trimmed_R1.fastq.gz \
+        --adapter_fasta $adapter \
+        --json ${meta.sample_name}.fastp.json
+        """
+    }
+}
+
+/* process trim_galore {
     //debug true
     tag "${meta.sample_name}"
     cpus 4
@@ -97,7 +111,7 @@ process trim_galore {
     --output_dir ./
     """
     }
-}
+} */
 
 process star {
     //debug true
@@ -117,15 +131,15 @@ process star {
     output:
     tuple val(sample_name), path("${sample_name}.Aligned.sortedByCoord.out.bam"), val(is_SE), emit: bam
     tuple val(sample_name), path("${sample_name}.Aligned.sortedByCoord.out.bam.bai"), emit: bai
-    tuple val(sample_name), path("${sample_name}.Log.final.out"), emit: log_final
-    tuple val(sample_name), path("${sample_name}.Log.out"), emit: log_out
-    tuple val(sample_name), path("${sample_name}.ReadsPerGene.out.tab"), emit: read_per_gene_out
-    tuple val(sample_name), path("${sample_name}.SJ.out.tab"), emit: sj_out
-    tuple val(sample_name), path("${sample_name}._STAR*"), emit: out_dir // STARgenome and STARpass1
+    path("${sample_name}.Log.final.out"), emit: log_final
+    path("${sample_name}.Log.out"), emit: log_out
+    path("${sample_name}.ReadsPerGene.out.tab"), emit: read_per_gene_out
+    path("${sample_name}.SJ.out.tab"), emit: sj_out
+    path("${sample_name}._STAR*"), emit: out_dir // STARgenome and STARpass1
+    path("${sample_name}.log"), emit: star_log_out // STARgenome and STARpass1
 
     script:
     index = params.star_index.(params.genome)
-    def threads = task.cpus - 1
     """
     STAR \
     --runThreadN ${threads} \
@@ -191,7 +205,7 @@ process salmon {
     time "3h"
 
     cpus 12
-    memory '8 GB'
+    memory '24 GB'
 
     module "salmon/1.9"
     publishDir "${projectDir}/analysis/salmon/"
@@ -211,7 +225,7 @@ process salmon {
     index = params.salmon_index.(params.genome)
     """
     salmon quant \
-        -p $threads \
+        -p ${threads} \
         -l A \
         -i ${index} \
         $use_reads \
@@ -331,7 +345,7 @@ process multiqc {
 
     publishDir "${projectDir}/analysis/multiqc/", mode : "copy"
 
-    module 'python/3.6.2'
+    //module 'python/3.6.2'
 
     input:
     path(files)
@@ -340,8 +354,9 @@ process multiqc {
     path("*.html"), emit: multiqc_output
 
     script:
+    config_yaml = "/home/kimj32/config_defaults.yaml"
     """
-    multiqc ${projectDir}/analysis --filename "multiqc_report.html" --ignore '*STARpass1'
+    multiqc ${files} --filename "multiqc_report.html" --ignore '*STARpass1' --config ${config_yaml}
     """
 }
 
@@ -419,19 +434,19 @@ ch_reads = ch_samplesheet.splitCsv(header:true).map {
 workflow {
 
     fastqc(ch_reads)
-    trim_galore(ch_reads)
-    seqtk(trim_galore.out.trim_reads)
+    //trim_galore(ch_reads)
+    fastp(ch_reads)
+    seqtk(fastp.out.trim_reads)
     fastq_screen(seqtk.out.subsample_reads)
-    star(trim_galore.out.trim_reads)
+    star(fastp.out.trim_reads)
     sortMeRNA(seqtk.out.subsample_reads)
-    star.out.bam.view()
     qualimap(star.out.bam)
 
     if (params.run_salmon) {
-        salmon(trim_galore.out.trim_reads)
-        multiqc(qualimap.out.qualimap_out.mix(sortMeRNA.out.sortMeRNA_out, salmon.out.salmon_out).collect())
+        salmon(fastp.out.trim_reads)
+        multiqc(qualimap.out.qualimap_out.mix(sortMeRNA.out.sortMeRNA_out, salmon.out.salmon_out, star.out.log_final, star.out.read_per_gene_out, fastqc.out.zips).collect())
     } else {
-        multiqc( qualimap.out.qualimap_out.mix(sortMeRNA.out.sortMeRNA_out).collect() )
+        multiqc( qualimap.out.qualimap_out.mix(sortMeRNA.out.sortMeRNA_out, star.out.log_final, star.out.read_per_gene_out, fastqc.out.zips).collect() )
     }
 
     if (params.run_tpm_calculator) {

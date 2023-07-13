@@ -5,7 +5,7 @@
 #SBATCH --ntasks=1
 #SBATCH --partition=defq
 #SBATCH --cpus-per-task=1
-#SBATCH --mem-per-cpu=10000
+#SBATCH --mem=2G
 #SBATCH --time=12:00:00
 #SBATCH -o mrnaseq.%A.o
 #SBATCH -e mrnaseq.%A.e
@@ -13,7 +13,7 @@
 module load nextflow/22.04.3
 module load singularity/3.8.0
 
-nextflow run bulk_rnaseq.nf -c ./conf/run.config -resume -with-timeline time_line_report -with-trace
+nextflow run bulk_rnaseq.nf -c ./bulk_rnaseq_conf/run.config -resume -with-timeline time_line_report.html -with-trace
 
 module unload nextflow/22.04.3
 module unload singularity/3.8.0
