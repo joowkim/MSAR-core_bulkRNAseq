@@ -10,7 +10,7 @@ def getLibraryId( prefix ){
 
 // Gather the pairs of R1/R2 according to sample ID
 Channel
-     .fromFilePairs(params.raw_data_dir + '/*R{1,2}*.fastq.gz', flat: true, checkExists: true)
+     .fromFilePairs(params.rawdata + '/*R{1,2}*.fastq.gz', flat: true, checkExists: true)
      .map { prefix, R1, R2 -> tuple(getLibraryId(prefix), R1, R2) }
      .groupTuple().set{ files_channel }
 
@@ -32,8 +32,8 @@ process merge_lane {
         // .findAll{ it.contains("_R1_001")}
     script:
         """
-        cat ${ R1.collect{ it }.sort().join(" ") } > ${sample}_R1.fastq.gz
-        cat ${ R2.collect{ it }.sort().join(" ") } > ${sample}_R2.fastq.gz
+        cat ${ R1.collect{ it }.join(" ") } > ${sample}_R1.fastq.gz
+        cat ${ R2.collect{ it }.join(" ") } > ${sample}_R2.fastq.gz
         """
 }
 

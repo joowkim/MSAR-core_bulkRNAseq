@@ -29,7 +29,7 @@ process fastp {
     tag "${meta.sample_name}"
     // label "universal"
     cpus 8
-    memory '8 GB'
+    memory '16 GB'
 
     publishDir "${launchDir}/analysis/fastp/", mode: "copy"
 
@@ -40,7 +40,7 @@ process fastp {
 
     output:
     tuple val(meta.sample_name), path("${meta.sample_name}_trimmed_R*.fastq.gz"), val(meta.single_end), emit: trim_reads
-    path("${meta.sample_name}.fastp.json"), emit: json
+    path("${meta.sample_name}.fastp.json"), emit: "fastp_json"
 
     script:
     def adapter = "/mnt/beegfs/kimj32/reference/adapters.fa"
@@ -116,21 +116,21 @@ process fastp {
 process star {
     //debug true
     tag "${sample_name}"
-    cpus 12
+    cpus 10
     memory '42 GB'
     time "3h"
 
     publishDir "${projectDir}/analysis/star/", mode : "copy"
 
     module "STAR/2.7.10a"
-    module 'samtools/1.16.1'
+    //module 'samtools/1.16.1'
 
     input:
     tuple val(sample_name), path(reads), val(is_SE)
 
     output:
     tuple val(sample_name), path("${sample_name}.Aligned.sortedByCoord.out.bam"), val(is_SE), emit: bam
-    tuple val(sample_name), path("${sample_name}.Aligned.sortedByCoord.out.bam.bai"), emit: bai
+    //tuple val(sample_name), path("${sample_name}.Aligned.sortedByCoord.out.bam.bai"), emit: bai
     path("${sample_name}.Log.final.out"), emit: log_final
     path("${sample_name}.Log.out"), emit: log_out
     path("${sample_name}.ReadsPerGene.out.tab"), emit: read_per_gene_out
@@ -142,7 +142,7 @@ process star {
     index = params.star_index.(params.genome)
     """
     STAR \
-    --runThreadN ${threads} \
+    --runThreadN ${task.cpus} \
     --genomeDir ${index} \
     --readFilesIn ${reads} \
     --twopassMode Basic \
@@ -150,9 +150,31 @@ process star {
     --outSAMtype BAM SortedByCoordinate \
     --outFileNamePrefix ${sample_name}. \
     --quantMode GeneCounts \
-    --outStd Log 2> ${sample_name}.log \
+    --outStd Log 2> ${sample_name}.log
 
-    samtools index "${sample_name}.Aligned.sortedByCoord.out.bam"
+    """
+    // samtools index ${sample_name}.Aligned.sortedByCoord.out.bam
+}
+
+
+process samtools_index {
+    tag "${sample_name}"
+    time "2h"
+    cpus 8
+    memory '8 GB'
+
+    publishDir "${projectDir}/analysis/samtools_index/"
+
+    input:
+    tuple val(sample_name), path(bam), val(is_SE)
+
+    output:
+    tuple val(sample_name), path("${sample_name}.Aligned.sortedByCoord.out.bam"), val(is_SE), emit : bam
+    path("${sample_name}.Aligned.sortedByCoord.out.bam.bai")
+
+    script:
+    """
+    samtools index ${bam}
     """
 }
 
@@ -204,7 +226,7 @@ process salmon {
     tag "${sample_name}"
     time "3h"
 
-    cpus 12
+    cpus 8
     memory '24 GB'
 
     module "salmon/1.9"
@@ -240,7 +262,7 @@ process seqtk {
     tag "${sample_name}"
     time "2h"
 
-    cpus 2
+    cpus 1
     memory '4 GB'
 
     publishDir "${projectDir}/analysis/seqtk/"
@@ -265,7 +287,7 @@ process seqtk {
      time "2h"
 
      cpus 8
-     memory '8 GB'
+     memory '16 GB'
 
      publishDir "${projectDir}/analysis/sortMeRNA/"
 
@@ -280,14 +302,14 @@ process seqtk {
      script:
      def threads = task.cpus - 1
      def idx = "/mnt/beegfs/kimj32/tools/sortmerna/idx"
-     def rfam5_8s = "/home/kimj32/beegfs/tools/sortmerna/data/rRNA_databases/rfam-5.8s-database-id98.fasta"
-     def rfam5s = "/home/kimj32/beegfs/tools/sortmerna/data/rRNA_databases/rfam-5s-database-id98.fasta"
-     def silva_arc_16s = "/home/kimj32/beegfs/tools/sortmerna/data/rRNA_databases/silva-arc-16s-id95.fasta"
-     def silva_arc_23s = "/home/kimj32/beegfs/tools/sortmerna/data/rRNA_databases/silva-arc-23s-id98.fasta"
-     def silva_euk_18s = "/home/kimj32/beegfs/tools/sortmerna/data/rRNA_databases/silva-euk-18s-id95.fasta"
-     def silva_euk_28s = "/home/kimj32/beegfs/tools/sortmerna/data/rRNA_databases/silva-euk-28s-id98.fasta"
-     def silva_bac_16s = "/home/kimj32/beegfs/tools/sortmerna/data/rRNA_databases/silva-bac-16s-id90.fasta"
-     def silva_bac_23s = "/home/kimj32/beegfs/tools/sortmerna/data/rRNA_databases/silva-bac-23s-id98.fasta"
+     def rfam5_8s = "/mnt/beegfs/kimj32/tools/sortmerna/data/rRNA_databases/rfam-5.8s-database-id98.fasta"
+     def rfam5s = "/mnt/beegfs/kimj32/tools/sortmerna/data/rRNA_databases/rfam-5s-database-id98.fasta"
+     def silva_arc_16s = "/mnt/beegfs/kimj32/tools/sortmerna/data/rRNA_databases/silva-arc-16s-id95.fasta"
+     def silva_arc_23s = "/mnt/beegfs/kimj32/tools/sortmerna/data/rRNA_databases/silva-arc-23s-id98.fasta"
+     def silva_euk_18s = "/mnt/beegfs/kimj32/tools/sortmerna/data/rRNA_databases/silva-euk-18s-id95.fasta"
+     def silva_euk_28s = "/mnt/beegfs/kimj32/tools/sortmerna/data/rRNA_databases/silva-euk-28s-id98.fasta"
+     def silva_bac_16s = "/mnt/beegfs/kimj32/tools/sortmerna/data/rRNA_databases/silva-bac-16s-id90.fasta"
+     def silva_bac_23s = "/mnt/beegfs/kimj32/tools/sortmerna/data/rRNA_databases/silva-bac-23s-id98.fasta"
      """
      sortmerna --threads ${threads} \
      -reads ${reads[0]} \
@@ -310,7 +332,7 @@ process fastq_screen {
     time "2h"
 
     cpus 4
-    memory '8 GB'
+    memory '16 GB'
 
     publishDir "${projectDir}/analysis/fastq_screen"
 
@@ -322,7 +344,7 @@ process fastq_screen {
 
     output:
     path("*.html")
-    path("*.txt")
+    path("*.txt"), emit: "fastq_screen_out"
 
     // threads option is already defined in fastq_screeN_conf
     script:
@@ -340,7 +362,7 @@ process multiqc {
     //tag "Multiqc on the project"
     time "1h"
 
-    cpus 1
+    cpus 2
     memory '4 GB'
 
     publishDir "${projectDir}/analysis/multiqc/", mode : "copy"
@@ -439,14 +461,15 @@ workflow {
     seqtk(fastp.out.trim_reads)
     fastq_screen(seqtk.out.subsample_reads)
     star(fastp.out.trim_reads)
+    samtools_index(star.out.bam)
     sortMeRNA(seqtk.out.subsample_reads)
-    qualimap(star.out.bam)
+    qualimap(samtools_index.out.bam)
 
     if (params.run_salmon) {
         salmon(fastp.out.trim_reads)
-        multiqc(qualimap.out.qualimap_out.mix(sortMeRNA.out.sortMeRNA_out, salmon.out.salmon_out, star.out.log_final, star.out.read_per_gene_out, fastqc.out.zips).collect())
+        multiqc(qualimap.out.qualimap_out.mix(sortMeRNA.out.sortMeRNA_out, salmon.out.salmon_out, star.out.log_final, star.out.read_per_gene_out, fastqc.out.zips, fastq_screen.out.fastq_screen_out, fastp.out.fastp_json).collect())
     } else {
-        multiqc( qualimap.out.qualimap_out.mix(sortMeRNA.out.sortMeRNA_out, star.out.log_final, star.out.read_per_gene_out, fastqc.out.zips).collect() )
+        multiqc( qualimap.out.qualimap_out.mix(sortMeRNA.out.sortMeRNA_out, star.out.log_final, star.out.read_per_gene_out, fastqc.out.zips, fastq_screen.out.fastq_screen_out, fastp.out.fastp_json).collect() )
     }
 
     if (params.run_tpm_calculator) {

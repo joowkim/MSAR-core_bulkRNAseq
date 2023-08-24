@@ -125,7 +125,8 @@ star_to_mat <- function(dir, rgx, column, rm_ens_vers = TRUE){
   
   # remove version number from gene ids if rm_ens_vers
   if (rm_ens_vers) {
-    new_gene_ids <- stringr::str_remove(rownames(count_mat), "\\.\\d+$")
+    ## new_gene_ids <- stringr::str_remove(rownames(count_mat), "\\.\\d+$")
+    new_gene_ids <- rownames(count_mat)
     
     # check that removing the version # does not affect uniqueness.
     stopifnot(identical(length(unique(new_gene_ids)), length(rownames(count_mat))))

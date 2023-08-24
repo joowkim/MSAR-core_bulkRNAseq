@@ -29,7 +29,7 @@ process multiqc {
     debug true
     tag "Multiqc on this project"
 
-    cpus 1
+    cpus 2
     memory '1 GB'
 
     publishDir "${launchDir}/analysis/multiqc/", mode : "copy"
