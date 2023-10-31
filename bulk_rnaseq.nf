@@ -50,7 +50,6 @@ process fastp {
         -i ${reads[0]} \
         -I ${reads[1]} \
         --thread ${task.cpus} \
-        --trim_poly_g \
         --qualified_quality_phred 20 \
         -o ${meta.sample_name}_trimmed_R1.fastq.gz \
         -O ${meta.sample_name}_trimmed_R2.fastq.gz \
@@ -116,8 +115,8 @@ process fastp {
 process star {
     //debug true
     tag "${sample_name}"
-    cpus 10
-    memory '42 GB'
+    cpus 12
+    memory '64 GB'
     time "3h"
 
     publishDir "${projectDir}/analysis/star/", mode : "copy"
@@ -226,8 +225,8 @@ process salmon {
     tag "${sample_name}"
     time "3h"
 
-    cpus 8
-    memory '24 GB'
+    cpus 12
+    memory '64 GB'
 
     module "salmon/1.9"
     publishDir "${projectDir}/analysis/salmon/"
@@ -262,7 +261,7 @@ process seqtk {
     tag "${sample_name}"
     time "2h"
 
-    cpus 1
+    cpus 2
     memory '4 GB'
 
     publishDir "${projectDir}/analysis/seqtk/"
@@ -284,20 +283,21 @@ process seqtk {
  process sortMeRNA {
      //debug true
      tag "${sample_name}"
-     time "2h"
+     time "4h"
 
-     cpus 8
-     memory '16 GB'
+     cpus 12
+     memory '64 GB'
 
      publishDir "${projectDir}/analysis/sortMeRNA/"
 
      module 'sortmerna/4.3.6'
 
      input:
-     tuple val(sample_name), path(reads)
+     tuple val(sample_name), path(reads), val(is_SE)
 
      output:
      path ("*"), emit: sortMeRNA_out
+     tuple val(sample_name), path("${sample_name}_{fwd,rev}.fq.gz"), val(is_SE) , emit: sortMeRNA_fq
 
      script:
      def threads = task.cpus - 1
@@ -312,17 +312,18 @@ process seqtk {
      def silva_bac_23s = "/mnt/beegfs/kimj32/tools/sortmerna/data/rRNA_databases/silva-bac-23s-id98.fasta"
      """
      sortmerna --threads ${threads} \
-     -reads ${reads[0]} \
-     --workdir sortMeRNA_${sample_name}  \
+     --fastx \
+     --reads ${reads[0]} \
+     --reads ${reads[1]} \
+     --workdir ${sample_name}  \
      --idx-dir ${idx}  \
-     --ref ${rfam5s}  \
-     --ref ${rfam5_8s}  \
-     --ref ${silva_arc_16s}  \
-     --ref ${silva_arc_23s}  \
      --ref ${silva_bac_16s}  \
      --ref ${silva_bac_23s}  \
      --ref ${silva_euk_18s}  \
-     --ref ${silva_euk_28s}
+     --ref ${silva_euk_28s} \
+     --out2 \
+     --paired_out \
+     --other ${sample_name}
      """
 }
 
@@ -363,7 +364,7 @@ process multiqc {
     time "1h"
 
     cpus 2
-    memory '4 GB'
+    memory '2 GB'
 
     publishDir "${projectDir}/analysis/multiqc/", mode : "copy"
 
@@ -456,13 +457,14 @@ ch_reads = ch_samplesheet.splitCsv(header:true).map {
 workflow {
 
     fastqc(ch_reads)
-    //trim_galore(ch_reads)
+    // trim_galore(ch_reads)
     fastp(ch_reads)
     seqtk(fastp.out.trim_reads)
     fastq_screen(seqtk.out.subsample_reads)
-    star(fastp.out.trim_reads)
+    sortMeRNA(fastp.out.trim_reads)
+    star(sortMeRNA.out.sortMeRNA_fq)
     samtools_index(star.out.bam)
-    sortMeRNA(seqtk.out.subsample_reads)
+
     qualimap(samtools_index.out.bam)
 
     if (params.run_salmon) {
