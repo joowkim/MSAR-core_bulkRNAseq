@@ -283,7 +283,6 @@ process seqtk {
  process sortMeRNA {
      //debug true
      tag "${sample_name}"
-     time "4h"
 
      cpus 12
      memory '64 GB'
