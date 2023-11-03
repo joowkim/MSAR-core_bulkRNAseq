@@ -314,10 +314,8 @@ process seqtk {
      --fastx \
      --reads ${reads[0]} \
      --reads ${reads[1]} \
-     --workdir ${sample_name}  \
+     --workdir ${sample_name}_sortMeRNA  \
      --idx-dir ${idx}  \
-     --ref ${silva_bac_16s}  \
-     --ref ${silva_bac_23s}  \
      --ref ${silva_euk_18s}  \
      --ref ${silva_euk_28s} \
      --out2 \
