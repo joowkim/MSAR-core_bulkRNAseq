@@ -114,8 +114,8 @@ process fastp {
 process star {
     //debug true
     tag "${sample_name}"
-    cpus 12
-    memory '64 GB'
+    cpus 10
+    memory '128 GB'
     time "3h"
 
     publishDir "${projectDir}/analysis/star/", mode : "copy"
@@ -224,8 +224,8 @@ process salmon {
     tag "${sample_name}"
     time "3h"
 
-    cpus 12
-    memory '64 GB'
+    cpus 10
+    memory '48 GB'
 
     module "salmon/1.9"
     publishDir "${projectDir}/analysis/salmon/"
@@ -244,7 +244,7 @@ process salmon {
     index = params.salmon_index.(params.genome)
     """
     salmon quant \
-        -p ${task.cpus \
+        -p ${task.cpus} \
         -l A \
         -i ${index} \
         $use_reads \
