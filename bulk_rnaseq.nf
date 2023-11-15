@@ -4,8 +4,7 @@ process fastqc {
     debug true
     tag "${meta.sample_name}"
     cpus 8
-    memory '4 GB'
-    time "2h"
+    memory '16 GB'
 
     publishDir "${projectDir}/analysis/fastqc/"
 
@@ -28,7 +27,7 @@ process fastp {
     debug true
     tag "${meta.sample_name}"
     // label "universal"
-    cpus 8
+    cpus 10
     memory '16 GB'
 
     publishDir "${launchDir}/analysis/fastp/", mode: "copy"
@@ -181,7 +180,7 @@ process qualimap {
     tag "${sample_name}"
     time "4h"
 
-    cpus 8
+    cpus 10
     memory '16 GB'
 
     publishDir "${projectDir}/analysis/qualimap/"
@@ -281,7 +280,6 @@ process seqtk {
  process sortMeRNA {
      //debug true
      tag "${sample_name}"
-     time "4h"
 
      cpus 8
      memory '16 GB'
@@ -328,7 +326,7 @@ process fastq_screen {
     tag "${sample_name}"
     time "2h"
 
-    cpus 4
+    cpus 8
     memory '16 GB'
 
     publishDir "${projectDir}/analysis/fastq_screen"
