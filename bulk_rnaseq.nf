@@ -5,7 +5,6 @@ process fastqc {
     tag "${meta.sample_name}"
     cpus 8
     memory '4 GB'
-    time "2h"
 
     publishDir "${projectDir}/analysis/fastqc/"
 
@@ -116,8 +115,7 @@ process star {
     //debug true
     tag "${sample_name}"
     cpus 12
-    memory '64 GB'
-    time "3h"
+    memory '128 GB'
 
     publishDir "${projectDir}/analysis/star/", mode : "copy"
 
@@ -183,7 +181,7 @@ process qualimap {
     time "4h"
 
     cpus 8
-    memory '16 GB'
+    memory '32 GB'
 
     publishDir "${projectDir}/analysis/qualimap/"
 
@@ -226,7 +224,7 @@ process salmon {
     time "3h"
 
     cpus 12
-    memory '64 GB'
+    memory '84 GB'
 
     module "salmon/1.9"
     publishDir "${projectDir}/analysis/salmon/"
@@ -259,7 +257,6 @@ process salmon {
 process seqtk {
     //debug true
     tag "${sample_name}"
-    time "2h"
 
     cpus 2
     memory '4 GB'
@@ -285,7 +282,7 @@ process seqtk {
      tag "${sample_name}"
 
      cpus 12
-     memory '64 GB'
+     memory '84 GB'
 
      publishDir "${projectDir}/analysis/sortMeRNA/"
 
@@ -327,10 +324,9 @@ process seqtk {
 process fastq_screen {
     //debug true
     tag "${sample_name}"
-    time "2h"
 
-    cpus 4
-    memory '16 GB'
+    cpus 8
+    memory '32 GB'
 
     publishDir "${projectDir}/analysis/fastq_screen"
 
@@ -346,7 +342,7 @@ process fastq_screen {
 
     // threads option is already defined in fastq_screeN_conf
     script:
-    def conf = params.fastq_screen_conf
+    def conf = params.fastq_screen_conf // "/mnt/beegfs/kimj32/polymerase/polymeraseDependencies/FastQ_Screen_Genomes/fastq_screen.conf"
     """
     fastq_screen --aligner bowtie2 \
     --conf ${conf} \
@@ -358,7 +354,6 @@ process fastq_screen {
 process multiqc {
     //debug true
     //tag "Multiqc on the project"
-    time "1h"
 
     cpus 2
     memory '2 GB'
