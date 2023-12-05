@@ -154,6 +154,26 @@ process star {
 }
 
 
+process preseq {
+    tag "${sample_name}"
+    cpus 8
+    memory '16 GB'
+
+    publishDir "${projectDir}/analysis/preseq/"
+
+    input
+    tuple val(sample_name), path(bam), val(is_SE) // val(is_SE) is not going to get used.
+
+    output:
+    path("${sample_name}_complexity_output.txt"), emit: preseq_output
+
+    script:
+    """
+    preseq lc_extrap -B -o ${sample_name}_complexity_output.txt ${bam}
+    """
+}
+
+
 process samtools_index {
     tag "${sample_name}"
     time "2h"
@@ -459,13 +479,14 @@ workflow {
     star(fastp.out.trim_reads)
     samtools_index(star.out.bam)
 
+    preseq(samtools_index.out.bam)
     qualimap(samtools_index.out.bam)
 
     if (params.run_salmon) {
         salmon(fastp.out.trim_reads)
-        multiqc(qualimap.out.qualimap_out.mix(sortMeRNA.out.sortMeRNA_out, salmon.out.salmon_out, star.out.log_final, star.out.read_per_gene_out, fastqc.out.zips, fastq_screen.out.fastq_screen_out, fastp.out.fastp_json).collect())
+        multiqc(qualimap.out.qualimap_out.mix(sortMeRNA.out.sortMeRNA_out, salmon.out.salmon_out, star.out.log_final, star.out.read_per_gene_out, fastqc.out.zips, fastq_screen.out.fastq_screen_out, fastp.out.fastp_json, preseq.out.preseq_output).collect())
     } else {
-        multiqc( qualimap.out.qualimap_out.mix(sortMeRNA.out.sortMeRNA_out, star.out.log_final, star.out.read_per_gene_out, fastqc.out.zips, fastq_screen.out.fastq_screen_out, fastp.out.fastp_json).collect() )
+        multiqc( qualimap.out.qualimap_out.mix(sortMeRNA.out.sortMeRNA_out, star.out.log_final, star.out.read_per_gene_out, fastqc.out.zips, fastq_screen.out.fastq_screen_out, fastp.out.fastp_json, preseq.out.preseq_output).collect() )
     }
 
     if (params.run_tpm_calculator) {
