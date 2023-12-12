@@ -168,9 +168,16 @@ process preseq {
     path("${sample_name}_complexity_output.txt"), emit: preseq_output
 
     script:
-    """
-    preseq lc_extrap -B -o ${sample_name}_complexity_output.txt ${bam}
-    """
+
+    if (!is_SE) {
+        """
+        preseq lc_extrap -B -o ${sample_name}_complexity_output.txt ${bam} -P
+        """
+    } else {
+        """
+        preseq lc_extrap -B -o ${sample_name}_complexity_output.txt ${bam}
+        """
+    }
 }
 
 
@@ -216,7 +223,7 @@ process qualimap {
     script:
     gtf = params.gtf.(params.genome)
 
-    if ( ! is_SE ) {
+    if (!is_SE) {
         // if sample is paired end data
         """
         qualimap rnaseq -bam ${bam} \
@@ -279,7 +286,7 @@ process seqtk {
     time "2h"
 
     cpus 2
-    memory '4 GB'
+    memory '8 GB'
 
     publishDir "${projectDir}/analysis/seqtk/"
 
@@ -289,12 +296,20 @@ process seqtk {
     tuple val(sample_name), path(reads), val(is_SE)
 
     output:
-    tuple val(sample_name), path("${sample_name}.subsample.100000.R1.fq.gz"), emit: subsample_reads
+    tuple val(sample_name), path("${sample_name}.subsample.100000.R{1,2}.fq.gz"), val(is_SE) emit: subsample_reads
 
     script:
-    """
-    seqtk sample -s 100 ${reads[0]} 100000 | gzip -c > ${sample_name}.subsample.100000.R1.fq.gz
-    """
+    def adapter = "/mnt/beegfs/kimj32/reference/adapters.fa"
+    if(!is_SE) {
+        """
+        seqtk sample -s 100 ${reads[0]} 100000 | gzip -c > ${sample_name}.subsample.100000.R1.fq.gz
+        seqtk sample -s 100 ${reads[1]} 100000 | gzip -c > ${sample_name}.subsample.100000.R2.fq.gz
+        """
+    } else {
+        """
+        seqtk sample -s 100 ${reads} 100000 | gzip -c > ${sample_name}.subsample.100000.R1.fq.gz
+        """
+    }
 }
 
  process sortMeRNA {
@@ -309,13 +324,13 @@ process seqtk {
      module 'sortmerna/4.3.6'
 
      input:
-     tuple val(sample_name), path(reads)
+     tuple val(sample_name), path(reads), val(is_SE)
 
      output:
      path ("*"), emit: sortMeRNA_out
 
      script:
-     def threads = task.cpus - 1
+     def threads = task.cpus
      def idx = "/mnt/beegfs/kimj32/tools/sortmerna/idx"
      def rfam5_8s = "/mnt/beegfs/kimj32/tools/sortmerna/data/rRNA_databases/rfam-5.8s-database-id98.fasta"
      def rfam5s = "/mnt/beegfs/kimj32/tools/sortmerna/data/rRNA_databases/rfam-5s-database-id98.fasta"
@@ -325,20 +340,40 @@ process seqtk {
      def silva_euk_28s = "/mnt/beegfs/kimj32/tools/sortmerna/data/rRNA_databases/silva-euk-28s-id98.fasta"
      def silva_bac_16s = "/mnt/beegfs/kimj32/tools/sortmerna/data/rRNA_databases/silva-bac-16s-id90.fasta"
      def silva_bac_23s = "/mnt/beegfs/kimj32/tools/sortmerna/data/rRNA_databases/silva-bac-23s-id98.fasta"
+
+     if (!is_SE) {
      """
-     sortmerna --threads ${threads} \
-     -reads ${reads[0]} \
-     --workdir sortMeRNA_${sample_name}  \
-     --idx-dir ${idx}  \
-     --ref ${rfam5s}  \
-     --ref ${rfam5_8s}  \
-     --ref ${silva_arc_16s}  \
-     --ref ${silva_arc_23s}  \
-     --ref ${silva_bac_16s}  \
-     --ref ${silva_bac_23s}  \
-     --ref ${silva_euk_18s}  \
-     --ref ${silva_euk_28s}
+         sortmerna --threads ${threads} \\
+         -reads ${reads[0]} \\
+         -reads ${reads[1]} \\
+         --workdir sortMeRNA_${sample_name}  \\
+         --idx-dir ${idx}  \\
+         --ref ${rfam5s}  \\
+         --ref ${rfam5_8s}  \\
+         --ref ${silva_arc_16s}  \\
+         --ref ${silva_arc_23s}  \\
+         --ref ${silva_bac_16s}  \\
+         --ref ${silva_bac_23s}  \\
+         --ref ${silva_euk_18s}  \\
+         --ref ${silva_euk_28s}
      """
+     } else {
+     """
+         sortmerna --threads ${threads} \
+         -reads ${reads} \
+         --workdir sortMeRNA_${sample_name}  \
+         --idx-dir ${idx}  \
+         --ref ${rfam5s}  \
+         --ref ${rfam5_8s}  \
+         --ref ${silva_arc_16s}  \
+         --ref ${silva_arc_23s}  \
+         --ref ${silva_bac_16s}  \
+         --ref ${silva_bac_23s}  \
+         --ref ${silva_euk_18s}  \
+         --ref ${silva_euk_28s}
+     """
+     }
+
 }
 
 process fastq_screen {
