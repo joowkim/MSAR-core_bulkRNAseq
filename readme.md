@@ -23,7 +23,14 @@ The pipeline is inspired by bulkRNAseq pipeline from bioinformatics and biostati
 5. Transcription quantification using `Salmon`
 
 ## How to execute the pipeline
-Adjust the configureation files such as `bulk_rnaseq_conf/run.config and cluster.config` After that,
+Adjust the configuration files such as `bulk_rnaseq_conf/run.config and cluster.config`. After that,
 ```
 sbatch run_bulk_rnaseq.slurm
 ```
+
+## Configuration
+
+- clustter configuration -> `cluster.config`
+- location of reference genome -> `reference.config`, `STAR` and `salmon` used.
+- singularity image file path -> `processes.config`
+- `run.config` for location of samplesheet and turn on/off `Ribodetector` for rRNA removal, `salmon` and `tpm calculator`
