@@ -1,10 +1,8 @@
 nextflow.enable.dsl=2
 
 process fastqc {
-    debug true
     tag "${meta.sample_name}"
-    cpus 8
-    memory '16 GB'
+    label "process_medium"
 
     publishDir "${projectDir}/analysis/fastqc/"
 
@@ -24,11 +22,8 @@ process fastqc {
 }
 
 process fastp {
-    debug true
     tag "${meta.sample_name}"
-
-    cpus 10
-    memory '16 GB'
+    label "process_medium"
 
     publishDir "${launchDir}/analysis/fastp/", mode: "copy"
 
@@ -46,34 +41,31 @@ process fastp {
     if(!meta.single_end) {
     """
     fastp \
-    -i ${reads[0]} \
-    -I ${reads[1]} \
-    --thread ${task.cpus} \
-    --qualified_quality_phred 20 \
-    -o ${meta.sample_name}_trimmed_R1.fastq.gz \
-    -O ${meta.sample_name}_trimmed_R2.fastq.gz \
-    --adapter_fasta $adapter \
-    --json ${meta.sample_name}.fastp.json
+        -i ${reads[0]} \
+        -I ${reads[1]} \
+        --thread ${task.cpus} \
+        --qualified_quality_phred 20 \
+        -o ${meta.sample_name}_trimmed_R1.fastq.gz \
+        -O ${meta.sample_name}_trimmed_R2.fastq.gz \
+        --adapter_fasta $adapter \
+        --json ${meta.sample_name}.fastp.json
     """
     } else {
     """
     fastp \
-    -i ${reads} \
-    --thread ${task.cpus} \
-    --qualified_quality_phred 20 \
-    -o ${meta.sample_name}_trimmed_R1.fastq.gz \
-    --adapter_fasta $adapter \
-    --json ${meta.sample_name}.fastp.json
+        -i ${reads} \
+        --thread ${task.cpus} \
+        --qualified_quality_phred 20 \
+        -o ${meta.sample_name}_trimmed_R1.fastq.gz \
+        --adapter_fasta $adapter \
+        --json ${meta.sample_name}.fastp.json
     """
     }
 }
 
 process ribo_detector {
-    debug true
     tag "${sample_name}"
-
-    cpus 20
-    memory '64 GB'
+    label "memory_medium"
 
     publishDir "${launchDir}/analysis/ribo_detector"
 
@@ -108,10 +100,8 @@ process ribo_detector {
 
 
 process star {
-    debug true
     tag "${sample_name}"
-    cpus 10
-    memory '128 GB'
+    label "memory_high"
 
     publishDir "${projectDir}/analysis/star/", mode : "copy"
 
@@ -136,16 +126,16 @@ process star {
     index = params.star_index.(params.genome)
     """
     STAR \
-    --runThreadN ${task.cpus} \
-    --genomeDir ${index} \
-    --readFilesIn ${reads} \
-    --twopassMode Basic \
-    --readFilesCommand zcat \
-    --outSAMtype BAM SortedByCoordinate \
-    --outFileNamePrefix ${sample_name}. \
-    --quantMode GeneCounts \
-    --outReadsUnmapped Fastx \
-    --outStd Log 2> ${sample_name}.log
+        --runThreadN ${task.cpus} \
+        --genomeDir ${index} \
+        --readFilesIn ${reads} \
+        --twopassMode Basic \
+        --readFilesCommand zcat \
+        --outSAMtype BAM SortedByCoordinate \
+        --outFileNamePrefix ${sample_name}. \
+        --quantMode GeneCounts \
+        --outReadsUnmapped Fastx \
+        --outStd Log 2> ${sample_name}.log
 
     gzip -c "${sample_name}.Unmapped.out.mate1" > "${sample_name}_Unmapped_R1.fastq.gz"
     gzip -c "${sample_name}.Unmapped.out.mate2" > "${sample_name}_Unmapped_R2.fastq.gz"
@@ -156,8 +146,7 @@ process star {
 
 process preseq {
     tag "${sample_name}"
-    cpus 10
-    memory '48 GB'
+    label "memory_medium"
 
     publishDir "${projectDir}/analysis/preseq/"
 
@@ -187,8 +176,7 @@ process preseq {
 
 process samtools_index {
     tag "${sample_name}"
-    cpus 8
-    memory '8 GB'
+    label "process_low"
 
     publishDir "${projectDir}/analysis/samtools_index/"
 
@@ -206,11 +194,8 @@ process samtools_index {
 }
 
 process qualimap {
-    debug true
     tag "${sample_name}"
-
-    cpus 10
-    memory '64 GB'
+    label "memory_medium"
 
     publishDir "${projectDir}/analysis/qualimap/"
 
@@ -229,30 +214,27 @@ process qualimap {
         // if sample is paired end data
     """
     qualimap rnaseq -bam ${bam} \\
-    -gtf ${gtf} \\
-    --paired \\
-    -outdir quailmap_${sample_name} \\
-    --java-mem-size=6G \\
-    --sequencing-protocol strand-specific-reverse
+        -gtf ${gtf} \\
+        --paired \\
+        -outdir quailmap_${sample_name} \\
+        --java-mem-size=6G \\
+        --sequencing-protocol strand-specific-reverse
     """
     } else {
         // if sample is single end data
     """
     qualimap rnaseq -bam ${bam} \\
-    -gtf ${gtf} \\
-    -outdir quailmap_${sample_name} \\
-    --java-mem-size=6G \\
-    --sequencing-protocol strand-specific-reverse
+        -gtf ${gtf} \\
+        -outdir quailmap_${sample_name} \\
+        --java-mem-size=6G \\
+        --sequencing-protocol strand-specific-reverse
     """
     } // end if else
 } // end process
 
 process salmon {
-    debug true
     tag "${sample_name}"
-
-    cpus 10
-    memory '48 GB'
+    label "memory_medium"
 
     module "salmon/1.9"
     publishDir "${projectDir}/analysis/salmon/"
@@ -282,12 +264,8 @@ process salmon {
 }
 
 process seqtk {
-    //debug true
     tag "${sample_name}"
-    time "2h"
-
-    cpus 4
-    memory '8 GB'
+    label "process_low"
 
     publishDir "${projectDir}/analysis/seqtk/"
 
@@ -313,11 +291,8 @@ process seqtk {
 }
 
 process sortMeRNA {
-    debug true
     tag "${sample_name}"
-
-    cpus 8
-    memory '16 GB'
+    label "process_medium"
 
     publishDir "${projectDir}/analysis/sortMeRNA/"
 
@@ -344,40 +319,40 @@ process sortMeRNA {
     if(!is_SE) {
      """
      sortmerna \\
-     --threads ${threads} \\
-     -reads ${reads[0]} \\
-     --workdir sortMeRNA_${sample_name}  \\
-     --ref ${rfam5s}  \\
-     --ref ${rfam5_8s}  \\
-     --ref ${silva_arc_16s}  \\
-     --ref ${silva_arc_23s}  \\
-     --ref ${silva_bac_16s}  \\
-     --ref ${silva_bac_23s}  \\
-     --ref ${silva_euk_18s}  \\
-     --ref ${silva_euk_28s}
+        --threads ${threads} \\
+        -reads ${reads[0]} \\
+        --workdir sortMeRNA_${sample_name}  \\
+        --ref ${rfam5s}  \\
+        --ref ${rfam5_8s}  \\
+        --ref ${silva_arc_16s}  \\
+        --ref ${silva_arc_23s}  \\
+        --ref ${silva_bac_16s}  \\
+        --ref ${silva_bac_23s}  \\
+        --ref ${silva_euk_18s}  \\
+        --ref ${silva_euk_28s}
      """
     } else {
      """
      sortmerna \\
-     --threads ${threads} \
-     -reads ${reads} \
-     --workdir sortMeRNA_${sample_name}  \
-     --ref ${rfam5s}  \
-     --ref ${rfam5_8s}  \
-     --ref ${silva_arc_16s}  \
-     --ref ${silva_arc_23s}  \
-     --ref ${silva_bac_16s}  \
-     --ref ${silva_bac_23s}  \
-     --ref ${silva_euk_18s}  \
-     --ref ${silva_euk_28s}
+        --threads ${threads} \
+        -reads ${reads} \
+        --workdir sortMeRNA_${sample_name}  \
+        --ref ${rfam5s}  \
+        --ref ${rfam5_8s}  \
+        --ref ${silva_arc_16s}  \
+        --ref ${silva_arc_23s}  \
+        --ref ${silva_bac_16s}  \
+        --ref ${silva_bac_23s}  \
+        --ref ${silva_euk_18s}  \
+        --ref ${silva_euk_28s}
      """
     }
      // --idx-dir ${idx}  \\
 }
 
 process fastq_screen {
-    debug true
     tag "${sample_name}"
+    label "process_medium"
 
     cpus 8
     memory '16 GB'
@@ -400,27 +375,23 @@ process fastq_screen {
     if(!is_SE) {
     """
     fastq_screen --aligner bowtie2 \
-    --conf ${conf} \
-    ${reads[0]} \
-    --outdir ./
+        --conf ${conf} \
+        ${reads[0]} \
+        --outdir ./
     """
     } else {
     """
     fastq_screen --aligner bowtie2 \
-    --conf ${conf} \
-    ${reads} \
-    --outdir ./
+        --conf ${conf} \
+        ${reads} \
+        --outdir ./
     """
     }
 }
 
 process multiqc {
-    //debug true
-    //tag "Multiqc on the project"
+    label "process_dual"
     time "1h"
-
-    cpus 2
-    memory '2 GB'
 
     publishDir "${projectDir}/analysis/multiqc/", mode : "copy"
 
@@ -440,11 +411,8 @@ process multiqc {
 }
 
 process tpm_calculator {
-    debug true
     tag "tpm_calculator on ${sample_name}"
-
-    cpus 8
-    memory '16 GB'
+    label "process_medium"
 
     publishDir (
         path: "${projectDir}/analysis/tpm_calculator/",
@@ -467,13 +435,13 @@ process tpm_calculator {
     if ( ! is_SE ) {
     """
     TPMCalculator -g ${gtf} \
-    -b ${bam_file} \
-    -p
+        -b ${bam_file} \
+        -p
     """
     } else {
     """
     TPMCalculator -g ${gtf} \
-    -b ${bam_file} \
+        -b ${bam_file} \
     """
     }
 }
