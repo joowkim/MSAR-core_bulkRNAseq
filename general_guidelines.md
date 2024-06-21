@@ -1,22 +1,3 @@
-### General guidelines for bulkRNAseq analysis
-1. General gene-level differential expression
-   - ENCODE guidelines suggest 30 million SE reads per sample (stranded).
-   - 15 million reads per sample is often sufficient, if there are a good number of replicates (>3).
-   - Spend money on more **biological replicates**, if possible.
-   - Generally recommended having read length >= 50 bp
-2. Gene-level differential expressoin with detection of lowly-expressed genes
-   - Similarly benefits from biological replicates more than sequencing depth.
-   - Sequence deeper with at least 30-60 million reads depending on level of expression (start with 30 million with a good number of replicates).
-   - Generally recommended to have read length >= 50 bp
-3. Isoform-level differential expression:
-   - Of known isoforms, suggested to have a depth of at least 30 million reads per sample and paired-end reads.
-   - Of novel isoforms should have more depth (> 60 million reads per sample).
-   - Choose biological replicates over paired/deeper sequencing.
-   - Generally recommended having read length >= 50 bp, but longer is better as the reads will be more likely to cross exon junctions
-   - Perform careful QC of RNA quality. Be careful to use high quality preparation methods and restrict analysis to high quality RIN # samples.
-
-**This is from hbctraining.github.io** (https://hbctraining.github.io/Intro-to-rnaseq-fasrc-salmon-flipped/lessons/02_experimental_planning_considerations.html)
-
 ### Considerations for RNA Seq read length and coverage
 Different RNA-Seq experiment types require different sequencing read lengths and depth (number of reads per sample). This bulletin reviews RNA sequencing considerations and offers resources for planning RNA-Seq experiments.
 
@@ -56,7 +37,7 @@ information from both 5’ and 3’ ends of RNA species with stranded RNA-Seq li
 - Small RNA Analysis – Due to the short length of small RNA, a single read (usually a 50 bp read)
 typically covers the entire sequence. A read length of 50 bp sequences most small RNAs, plus enough of the adapter to be accurately identified and trimmed during data analysis.
 
-Reference(https://knowledge.illumina.com/library-preparation/rna-library-prep/library-preparation-rna-library-prep-reference_material-list/000001243)
+Reference - [Knowledge illumina](https://knowledge.illumina.com/library-preparation/rna-library-prep/library-preparation-rna-library-prep-reference_material-list/000001243)
 
 ### Designing the right experiment - How many reads do we need?
 
@@ -79,4 +60,23 @@ The amount of sequencing needed for a given sample is determined by the goals of
 - Transcriptome Analysis - longer PE reads (such as 2 x 75 bp)
 - Small RNA Analysis - short single read, e.g. SE 50 - will need trimming
 
-Reference(https://bioinformatics-core-shared-training.github.io/Bulk_RNASeq_Course_March23/Bulk_RNAseq_Course_Base/Markdowns/01_Introduction_to_RNAseq_Methods.html#6)
+Reference - [Cambridge institute](https://bioinformatics-core-shared-training.github.io/Bulk_RNASeq_Course_March23/Bulk_RNAseq_Course_Base/Markdowns/01_Introduction_to_RNAseq_Methods.html#6)
+
+### General guidelines for bulkRNAseq analysis
+1. General gene-level differential expression
+   - ENCODE guidelines suggest 30 million SE reads per sample (stranded).
+   - 15 million reads per sample is often sufficient, if there are a good number of replicates (>3).
+   - Spend money on more **biological replicates**, if possible.
+   - Generally recommended having read length >= 50 bp
+2. Gene-level differential expressoin with detection of lowly-expressed genes
+   - Similarly benefits from biological replicates more than sequencing depth.
+   - Sequence deeper with at least 30-60 million reads depending on level of expression (start with 30 million with a good number of replicates).
+   - Generally recommended to have read length >= 50 bp
+3. Isoform-level differential expression:
+   - Of known isoforms, suggested to have a depth of at least 30 million reads per sample and paired-end reads.
+   - Of novel isoforms should have more depth (> 60 million reads per sample).
+   - Choose biological replicates over paired/deeper sequencing.
+   - Generally recommended having read length >= 50 bp, but longer is better as the reads will be more likely to cross exon junctions
+   - Perform careful QC of RNA quality. Be careful to use high quality preparation methods and restrict analysis to high quality RIN # samples.
+
+Reference - [Havard Chan bioinformatics core](https://hbctraining.github.io/Intro-to-rnaseq-fasrc-salmon-flipped/lessons/02_experimental_planning_considerations.html)
