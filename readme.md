@@ -2,13 +2,13 @@
 The pipeline is inspired by bulkRNAseq pipeline from bioinformatics and biostatistics core at Van andel institute.
 ## Overview of the workflow
 
-1. Create a samplesheet file to execute the pipeline which should be a csv file following the format below:
+1. Create a samplesheet file to execute the pipeline which should be a `csv` file following the format below:
 
 | sample  | fq1                 | fq2                 |
 | ------- | ------------------- | ------------------- |
 | sampleA | sampleA_R1.fastq.gz | sampleA_R2.fastq.gz |
 
-2. Run QC tools
+2. Execute the pipeline. Following steps/tools will be executed.
    1. `fastqc` on each sample - raw fastq files
    2. `fastp` to trim adapter sequences and low quality reads
       1. below options used for `fastp`
