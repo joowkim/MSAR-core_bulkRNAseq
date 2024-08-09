@@ -210,23 +210,30 @@ process qualimap {
     script:
     gtf = params.gtf.(params.genome)
 
+    // Can't connect to X11 window server using 'localhost:22.0' as the value of the DISPLAY variable. export DISPLAY=:0.0
+    // https://stackoverflow.com/questions/10165761/java-cant-connect-to-x11-window-server-using-localhost10-0-as-the-value-of-t
+    // http://qualimap.conesalab.org/doc_html/faq.html#x11problem
     if (!is_SE) {
         // if sample is paired end data
     """
+    unset DISPLAY
+    java_options="-Djava.awt.headless=true"
     qualimap rnaseq -bam ${bam} \\
         -gtf ${gtf} \\
         --paired \\
         -outdir quailmap_${sample_name} \\
-        --java-mem-size=6G \\
+        --java-mem-size=${task.memory.toGiga()}G \\
         --sequencing-protocol strand-specific-reverse
     """
     } else {
         // if sample is single end data
     """
+    unset DISPLAY
+    java_options="-Djava.awt.headless=true"
     qualimap rnaseq -bam ${bam} \\
         -gtf ${gtf} \\
         -outdir quailmap_${sample_name} \\
-        --java-mem-size=6G \\
+        --java-mem-size=${task.memory.toGiga()}G \\
         --sequencing-protocol strand-specific-reverse
     """
     } // end if else
