@@ -453,6 +453,24 @@ process tpm_calculator {
     }
 }
 
+
+process gene_count_mat {
+    tag "gene count mat"
+    label "process_dual"
+
+    module "R/4.3.1"
+    publishDir "${projectDir}/analysis/gene_count_matrix", mode: "copy"
+
+    input:
+    path(read_per_gene_out)
+    //
+
+    output:
+    path("star_read_cnt.tsv")
+
+    script:
+    "Rscript star_to_mat.R ./"
+}
 // process kraken2{
 //     tag "${sample_name}"
 //     cpus 12
@@ -556,6 +574,7 @@ workflow {
 
     preseq(samtools_index.out.bam)
     qualimap(samtools_index.out.bam)
+
 
     } else {
 
