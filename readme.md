@@ -2,6 +2,8 @@
 The pipeline is inspired by bulkRNAseq pipeline from bioinformatics and biostatistics core at Van andel institute.
 ## Overview of the workflow
 
+![pipeline diagram](bulkRNAseq-workflow.png)
+
 1. Create a samplesheet file to execute the pipeline which should be a `csv` file following the format below:
 
 | sample  | fq1                 | fq2                 |
