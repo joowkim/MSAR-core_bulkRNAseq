@@ -469,7 +469,7 @@ process gene_count_mat {
     path("star_read_cnt.tsv")
 
     script:
-    "Rscript star_to_mat.R ./"
+    "Rscript ${projectDir}/bin/star_to_mat.R ./"
 }
 // process kraken2{
 //     tag "${sample_name}"
@@ -575,6 +575,7 @@ workflow {
     preseq(samtools_index.out.bam)
     qualimap(samtools_index.out.bam)
 
+    gene_count_mat(star.out.read_per_gene_out.collect())
 
     } else {
 
@@ -583,6 +584,9 @@ workflow {
 
     preseq(samtools_index.out.bam)
     qualimap(samtools_index.out.bam)
+
+    gene_count_mat(star.out.read_per_gene_out.collect())
+
     }
 
     if (params.run_salmon) {
