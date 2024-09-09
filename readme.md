@@ -36,3 +36,11 @@ sbatch run_bulk_rnaseq.slurm
 - location of reference genome -> `reference.config`, `STAR` and `salmon` used.
 - singularity image file path -> `processes.config`
 - `run.config` for location of samplesheet and turn on/off `Ribodetector` for rRNA removal, `salmon` and `tpm calculator`
+
+## Miscellaneous
+
+strand info: try https://github.com/signalbash/how_are_we_stranded_here
+
+https://github.com/igordot/genomics/blob/master/notes/rna-seq-strand.md
+
+reverse strand for Illumina TruSeq Stranded Total RNA
