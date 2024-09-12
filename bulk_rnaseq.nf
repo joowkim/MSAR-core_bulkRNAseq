@@ -48,6 +48,8 @@ process fastp {
         -o ${meta.sample_name}_trimmed_R1.fastq.gz \
         -O ${meta.sample_name}_trimmed_R2.fastq.gz \
         --adapter_fasta $adapter \
+        --trim_front1 1 \
+        --trim_front2 1 \
         --json ${meta.sample_name}.fastp.json
     """
     } else {
@@ -58,6 +60,7 @@ process fastp {
         --qualified_quality_phred 20 \
         -o ${meta.sample_name}_trimmed_R1.fastq.gz \
         --adapter_fasta $adapter \
+        --trim_front1 1 \
         --json ${meta.sample_name}.fastp.json
     """
     }
