@@ -44,3 +44,5 @@ strand info: try https://github.com/signalbash/how_are_we_stranded_here
 https://github.com/igordot/genomics/blob/master/notes/rna-seq-strand.md
 
 reverse strand for Illumina TruSeq Stranded Total RNA
+
+https://dbrg77.wordpress.com/2015/03/20/library-type-option-in-the-tuxedo-suite/
