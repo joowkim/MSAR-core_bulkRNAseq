@@ -14,7 +14,6 @@ The pipeline is inspired by bulkRNAseq pipeline from bioinformatics and biostati
    1. `fastqc` on each sample - raw fastq files
    2. `fastp` to trim adapter sequences and low quality reads
       1. below options used for `fastp`
-         - `--qualified_quality_phred 20`
          - `--adapter_fasta $adapter`
    3. `fastq_screen` on R1 fastq files to detect possible contaminants.
    4. `preseq` for library complexity
