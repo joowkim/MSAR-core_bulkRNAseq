@@ -326,7 +326,8 @@ process sortMeRNA {
     def silva_bac_16s = "/mnt/beegfs/kimj32/tools/sortmerna/data/rRNA_databases/silva-bac-16s-id90.fasta"
     def silva_bac_23s = "/mnt/beegfs/kimj32/tools/sortmerna/data/rRNA_databases/silva-bac-23s-id98.fasta"
 
-    if(!is_SE) {
+    // single-end
+    if(is_SE) {
      """
      sortmerna \\
         --threads ${threads} \\
