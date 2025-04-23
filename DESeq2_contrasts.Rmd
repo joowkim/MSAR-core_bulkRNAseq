@@ -240,6 +240,8 @@ pink <- colMeans(mod_mat[dds$colour == "pink", ])
 white <- colMeans(mod_mat[dds$colour == "white", ])
 yellow <- colMeans(mod_mat[dds$colour == "yellow", ])
 
+
+## https://bioinformatics-core-shared-training.github.io/Bulk_RNAseq_Course_Feb25/Bulk_RNAseq_Course_Base/Markdowns/07_Linear_Models.html#Extra:_Numeric_Contrasts
 pink_vc <- c(1,1,0)
 white_vc <- c(1,0,0)
 yellow_vc <- c(1,0,1)

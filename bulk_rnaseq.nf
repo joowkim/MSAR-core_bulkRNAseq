@@ -151,7 +151,7 @@ process preseq {
 
     publishDir "${projectDir}/analysis/preseq/"
 
-    //module 'preseq/3.2.0'
+    module 'preseq/3.2.0'
 
     input:
     tuple val(sample_name), path(bam), val(is_SE)
@@ -180,6 +180,8 @@ process samtools_index {
     label "process_low"
 
     publishDir "${projectDir}/analysis/samtools_index/"
+
+    module 'samtools/1.16.1'
 
     input:
     tuple val(sample_name), path(bam), val(is_SE)
@@ -214,11 +216,11 @@ process qualimap {
     // Can't connect to X11 window server using 'localhost:22.0' as the value of the DISPLAY variable. export DISPLAY=:0.0
     // https://stackoverflow.com/questions/10165761/java-cant-connect-to-x11-window-server-using-localhost10-0-as-the-value-of-t
     // http://qualimap.conesalab.org/doc_html/faq.html#x11problem
+    //     unset DISPLAY
+    // java_options="-Djava.awt.headless=true"
     if (!is_SE) {
         // if sample is paired end data
     """
-    unset DISPLAY
-    java_options="-Djava.awt.headless=true"
     qualimap rnaseq -bam ${bam} \\
         -gtf ${gtf} \\
         --paired \\
@@ -229,8 +231,6 @@ process qualimap {
     } else {
         // if sample is single end data
     """
-    unset DISPLAY
-    java_options="-Djava.awt.headless=true"
     qualimap rnaseq -bam ${bam} \\
         -gtf ${gtf} \\
         -outdir quailmap_${sample_name} \\
@@ -344,7 +344,7 @@ process sortMeRNA {
      """
      sortmerna \\
         --threads ${threads} \
-        -reads ${reads} \
+        -reads ${reads[1]} \
         --workdir sortMeRNA_${sample_name}  \
         --ref ${rfam5s}  \
         --ref ${rfam5_8s}  \
