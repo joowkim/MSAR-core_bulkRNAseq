@@ -1,0 +1,424 @@
+---
+title: "Library kit as a nuisance factor"
+format:
+  html:
+    theme: yeti
+    code_folding: hide
+    self_contained: yes
+    code-fold: true
+    code-tools: true
+editor: visual
+date: today
+author: "Joowook Kim"
+execute:
+  warning: false
+params:
+  project_name: "Library kit as a nuisance factor"
+---
+
+# Load lib
+
+```{r}
+suppressPackageStartupMessages({
+  library(readr)
+  library(dplyr)
+  library(ggplot2)
+  library(edgeR)
+  library(DESeq2)
+  library(limma)
+  library(pheatmap)
+  library(RColorBrewer)
+  library(ComplexHeatmap)
+  library(ExploreModelMatrix)
+})
+
+```
+
+# Experiment design
+
+2 factor design with 3 replicates:
+
+-   treatment factor ( IL-1$\beta$ treated/untreated), 2 levels
+
+-   nuisance factor (libraryKit - v4kit(Takara)/Pico(Takara)/truseq(illumina)), 3 levels
+
+```{r, Load data}
+v4 <- read_tsv("https://ftp.ncbi.nlm.nih.gov/geo/series/GSE124nnn/GSE124167/suppl/GSE124167_FINAL_master_list_of_gene_counts_MIN.V4.txt.gz") |>
+  dplyr::select(-geneCoordinate, -geneSymbol)
+
+pico <- read_tsv("https://ftp.ncbi.nlm.nih.gov/geo/series/GSE124nnn/GSE124167/suppl/GSE124167_FINAL_master_list_of_gene_counts_MIN.sense.Pico.R.txt.gz") |>
+  dplyr::select(-geneCoordinate, -geneSymbol)
+
+illum <- read_tsv("https://ftp.ncbi.nlm.nih.gov/geo/series/GSE124nnn/GSE124167/suppl/GSE124167_FINAL_master_list_of_gene_counts_MIN.sense.Truseq.txt.gz") |>
+  dplyr::select(-geneCoordinate, -geneSymbol)
+
+annot_df <- read_tsv("https://ftp.ncbi.nlm.nih.gov/geo/series/GSE124nnn/GSE124167/suppl/GSE124167_FINAL_master_list_of_gene_counts_MIN.sense.Truseq.txt.gz") |>
+  dplyr::select(id, geneSymbol)
+
+colnames(illum) <- sub("^Illumina\\.(ILB|UNT)_(\\d+)$", "\\1_\\2_truseq", colnames(illum))
+
+## merge data frames
+merged_df <- Reduce(function(x, y) merge(x, y, by = "id", all = TRUE), list(v4, pico, illum))
+
+## clean column name
+colnames(merged_df) <- colnames(merged_df) |> janitor::make_clean_names()
+
+## remove clonthe from colnames
+colnames(merged_df) <- colnames(merged_df) |> stringr::str_remove("_clontech")
+
+
+## check NAs
+print("checking NAs")
+is.na(merged_df) |> sum()
+
+## replace NAs with 0
+merged_df[is.na(merged_df)] <- 0
+
+count_df <- merged_df
+rm(merged_df)
+```
+
+## Meta data
+
+```{r, Meta data}
+
+## remove 'id' in colnames
+col <- colnames(count_df)[-1]
+meta <- data.frame(
+  sample = col,
+  ilb_trt = ifelse(grepl("^ilb_", col), "treated", "untreated"),
+  kit = sub(".*_(truseq|pico|v4)$", "\\1", col),
+  stringsAsFactors = FALSE
+) |>
+  mutate(ilb_trt = as.factor(ilb_trt),
+         kit = as.factor(kit)
+         )
+
+rm(col)
+
+DT::datatable(meta, filter = 'top')
+
+## change reference level for factors
+meta$ilb_trt <- relevel(meta$ilb_trt, "untreated")
+meta$kit <- relevel(meta$kit, "truseq")
+
+## check reference levels for factors
+print("chekcing reference levels ")
+str(meta)
+```
+
+# EDA
+
+## Before the kit effect adjusted
+
+The PCA plot shows substantial differences between library kits — PC1 explains 90% of the variance and appears to separate the different kit samples, while PC2 seems to separate between the treated and untreated.
+
+```{r, EDA1}
+
+rownames(count_df) <- count_df$id
+count_df <- count_df |> dplyr::select(-id)
+
+rownames(meta) <- meta$sample
+meta <- meta |> dplyr::select(-sample)
+
+## sanity check!!
+all(rownames(meta) %in% colnames(count_df))
+
+## this is for EDA
+dds <- DESeqDataSetFromMatrix(countData = count_df,
+                              colData = meta,
+                              design = ~ 1)
+
+## filter gene with less than 10 reads
+dds <- dds[ rowSums(counts(dds)) > 10, ]
+
+rld <- rlog(dds, blind=FALSE)
+
+pca_helper <- function(object, ntop=500, meta, sample_name = "sample") {
+  # object is either vst or rlog
+
+  # calculate the variance for each gene
+  # rv <- rowVars(assay(object))
+  rv <- rowVars(object)
+
+  # select the ntop genes by variance
+  select <- order(rv, decreasing=TRUE)[seq_len(min(ntop, length(rv)))]
+
+  # perform a PCA on the data in assay(x) for the selected genes
+  pca_obj <- prcomp(t((object)[select,]))
+
+  # get pca scores
+  pca_scores <- pca_obj$x %>% data.frame()
+
+  # get eigen values
+  pca_eigen_val <- round((summary(pca_obj)$importance[2,] * 100),1)
+  # return (pca)
+
+  # merge pca_socres and meta_df
+  merged_df <- pca_scores |> tibble::rownames_to_column(sample_name)
+  pca_merged_df <- left_join(merged_df, meta |>
+                               tibble::rownames_to_column(sample_name), by = sample_name)
+
+  result <- list(pca_merged_df, pca_eigen_val)
+  names(result) <- c("pca_merged_df", "pca_eigen_val")
+
+  return(result)
+}
+
+pca_merged_list <- pca_helper(assay(rld), ntop = Inf, meta = meta , sample_name = 'sample')
+## plot pca
+## pca pc1/pc2
+# see https://stackoverflow.com/questions/56547256/show-3-factors-ggplot-geom
+pcaplot_pc1_pc2 <- ggplot(pca_merged_list$pca_merged_df, aes(x=PC1, y=PC2, color=kit, shape=ilb_trt)) +
+  geom_point(size=5.5) +
+  # coord_fixed() +
+  # scale_size_manual(values=c(7,5))+
+  ggrepel::geom_text_repel(label=pca_merged_list$pca_merged_df$sample, box.padding = .5) +
+  xlab(paste0("PC1: ", pca_merged_list$pca_eigen_val[1], "%")) +
+  ylab(paste0("PC2: ", pca_merged_list$pca_eigen_val[2], "%")) +
+  ggtitle("PCA plot using all genes w rlog")  +
+  theme_bw() +
+  theme(aspect.ratio=1) +
+  theme(text = element_text(size = 30)) +
+  scale_size_manual(values = c(8,5))
+
+print(pcaplot_pc1_pc2)
+
+## pca pc1/pc3
+# pcaplot_pc1_pc3 <- ggplot(pca_merged_df, aes(x=PC1, y=PC3, color=cancer_subtype, shape=batch)) +  #, shape=Treat, size=Sex)) +
+#   geom_point(size=5.5) +
+#   # coord_fixed() +
+#   ggrepel::geom_text_repel(label=pca_merged_df$sample_name, box.padding = .5) +
+#   xlab(paste0("PC1: ", pca_eigen_val[1], "%")) +
+#   ylab(paste0("PC3: ", pca_eigen_val[3], "%")) +
+#   ggtitle("PCA plot using all genes")  +
+#   theme_bw() +
+#   theme(aspect.ratio=1) +
+#   theme(text = element_text(size = 30))
+
+# print(pcaplot_pc1_pc3)
+
+sampleDists <- dist( t( assay(rld) ) )
+
+sampleDistMatrix <- as.matrix( sampleDists )
+
+annotation_col = data.frame(
+    ilb_trt = meta$ilb_trt,
+    kit = meta$kit
+)
+
+heat_anno <- HeatmapAnnotation(
+  df=annotation_col
+)
+
+set.seed(0)
+hmap <- pheatmap(sampleDistMatrix,
+                # clustering_distance_columns = sampleDists,
+                # clustering_distance_rows = sampleDists,
+                # rect_gp = gpar(col = "white", lwd = 2),
+                # # row_names_gp = gpar(fontsize = 5),
+                # # row_dend_side = 'left',
+                # column_title = "Heatmap of the sample-to-sample based on Euclidean distances",
+                heatmap_legend_param = list(
+                                title = "Euclidean dist"),
+                annotation_col = annotation_col
+                )
+
+print(hmap)
+```
+
+## After the kit effect adjusted
+
+```{r, EDA2}
+rld_filt <- rld
+assay(rld_filt)<- limma::removeBatchEffect(assay(rld_filt), rld_filt$kit)
+
+pca_merged_list <- pca_helper(assay(rld_filt), ntop = Inf, meta = meta , sample_name = 'sample')
+
+pcaplot_pc1_pc2 <- ggplot(pca_merged_list$pca_merged_df, aes(x=PC1, y=PC2, color=kit, shape=ilb_trt)) +
+  geom_point(size=5.5) +
+  # coord_fixed() +
+  # scale_size_manual(values=c(7,5))+
+  ggrepel::geom_text_repel(label=pca_merged_list$pca_merged_df$sample, box.padding = .5) +
+  xlab(paste0("PC1: ", pca_merged_list$pca_eigen_val[1], "%")) +
+  ylab(paste0("PC2: ", pca_merged_list$pca_eigen_val[2], "%")) +
+  ggtitle("PCA plot using all genes w rlog")  +
+  theme_bw() +
+  theme(aspect.ratio=1) +
+  theme(text = element_text(size = 15)) +
+  scale_size_manual(values = c(8,5))
+
+print(pcaplot_pc1_pc2)
+
+
+```
+
+# Fit a model to the data
+
+There are different ways of writing out/parameterization of model. One is `cell means model` and another is `effect model` and the other is `reference coded/mean reference model`. The reference coded model is R's default setting.
+
+> The reference coded model writes out the model in terms of a ***baseline group*** and deviations from that baseline or reference level. The reference-coded model for the $i^{th}$ subject in the $j^{th}$ group is $y_{ij} = {\color{purple}{\boldsymbol{\alpha + \tau_j}}}+\varepsilon_{ij}$ where $\color{purple}{\boldsymbol{\alpha}}$ ("alpha") is the true mean for the baseline group (usually first alphabetically) and the $\color{purple}{\boldsymbol{\tau_j}}$ (tau $j$) are the deviations from the baseline group for group $j$. The deviation for the baseline group, $\color{purple}{\boldsymbol{\tau_1}}$, is always set to 0 so there are really just deviations for groups 2 through $J$. The equivalence between the reference-coded and cell means models can be seen by considering the mean for the first, second, and $J^{th}$ groups in both models:
+
+$$\begin{array}{lccc}
+& \textbf{Cell means:} && \textbf{Reference-coded:}\\
+\textbf{Group } 1: & \color{red}{\mu_1} && \color{purple}{\boldsymbol{\alpha}} \\
+\textbf{Group } 2: & \color{red}{\mu_2} && \color{purple}{\boldsymbol{\alpha + \tau_2}} \\
+\ldots & \ldots && \ldots \\
+\textbf{Group } J: & \color{red}{\mu_J} && \color{purple}{\boldsymbol{\alpha +\tau_J}}
+\end{array}$$
+
+> -- <cite>https://greenwood-stat.github.io/GreenwoodBookHTML/chapter3.html#section3-2</cite>
+
+Further reading:
+
+[A guide to creating design matrices for gene expression experiments](https://pmc.ncbi.nlm.nih.gov/articles/PMC7873980/)
+
+[Linear models from bioinformatics-core-shared-training.github.io](https://bioinformatics-core-shared-training.github.io/Bulk_RNAseq_Course_June24/Bulk_RNAseq_Course_Base/Markdowns/07_Linear_Models.html#Common_Designs)
+
+[STAT 502 Analysis of Variance and Design of Experiments from Penn State](https://online.stat.psu.edu/stat502/lesson/welcome-stat-502)
+
+Here we use the model formula as `~ kit + ilb_trt`.
+
+```{r, Fit model}
+dds <- DESeqDataSetFromMatrix(countData = count_df,
+                              colData = meta,
+                              design = ~ + ilb_trt + kit)
+
+## filter gene with less than 10 reads
+dds <- dds[ rowSums(counts(dds)) > 10, ]
+
+dds <- DESeq(dds)
+res <- results(dds)
+
+print("model matix")
+model.matrix(design(dds), colData(dds))
+
+print("ExploreModelMatrix")
+vd <- VisualizeDesign(sampleData = meta,
+                      designFormula = ~ ilb_trt + kit,
+                      textSizeFitted = 4)
+
+cowplot::plot_grid(plotlist = vd$plotlist)
+cowplot::plot_grid(plotlist = vd$cooccurrenceplots)
+
+# coefficients
+print("model coefficients")
+resultsNames(dds)
+
+# fdr filtering
+# res <- results(dds, contrast=c("ilb_trt","treated","untreated"), alpha=0.1)
+
+## shrink logFC
+res <- lfcShrink(dds, contrast=c("ilb_trt","treated","untreated"), type="ashr", lfcThreshold=1)
+res <- res[order(res$pvalue), ]
+## MA plot
+# plotMA(res)
+
+out_df <- as.data.frame(res) |>
+  tibble::rownames_to_column(var = 'id') |>
+  left_join(annot_df, by = 'id') |>
+  dplyr::rename(gene_symbol = geneSymbol,
+                gene_id = id) |>
+  mutate(uniq_symbol = scater::uniquifyFeatureNames(ID = gene_id, names = gene_symbol)) |>
+  relocate(gene_symbol, .after = gene_id) |>
+  relocate(uniq_symbol, .after = gene_symbol) |>
+  as_tibble()
+
+## create a res output file
+# write_tsv(out_df, "somepath")
+```
+
+## Top 20 genes heatmap using rlog
+
+```{r, Top 20 genes heatmap, fig.width=6, fig.height=6}
+top_genes <- out_df |>
+  arrange(padj) |>
+  # dplyr::arrange(dplyr::desc(abs(log2FoldChange))) |>
+  head(20) |>
+  dplyr::select(gene_id, uniq_symbol) |>
+  as.data.frame() |>
+  as_tibble()
+  # tibble::column_to_rownames(var = "uniq_symbol")
+
+mat <- assay(rld_filt) |>
+  as.data.frame() |>
+  tibble::rownames_to_column(var = "gene_id") |>
+  as_tibble()
+
+mat <- left_join(top_genes, mat, by = "gene_id") |>
+  as.data.frame() |>
+  dplyr::select(-gene_id) |>
+  tibble::column_to_rownames(var = 'uniq_symbol')
+
+annotation_col = data.frame(
+    ilb_trt = meta$ilb_trt
+    # kit = meta$kit
+)
+
+set.seed(0)
+hmap <- pheatmap(mat,
+                # clustering_distance_columns = sampleDists,
+                # clustering_distance_rows = sampleDists,
+                # rect_gp = gpar(col = "white", lwd = 2),
+                # # row_names_gp = gpar(fontsize = 5),
+                # # row_dend_side = 'left',
+                # column_title = "Heatmap of the sample-to-sample based on Euclidean distances",
+                heatmap_legend_param = list(
+                                title = "centered rlog"),
+                annotation_col = annotation_col
+                )
+
+print(hmap)
+```
+
+## Volcano plot
+
+```{r, Volcano plot, fig.width=4, fig.height=4}}
+make_volcano <- function(df, pval_nm, pval_cutoff=0.1){
+  # remove genes with NA for pvalue
+
+  df <- df |> tidyr::drop_na(pval_nm)
+
+  top_genes <- df |>
+    dplyr::arrange(desc(abs(df$log2FoldChange))) |>
+    dplyr::filter(row_number() <= 10) |>
+    dplyr::select(uniq_symbol) |>
+    as.vector()
+
+  df$Sig <- ifelse(df$padj <= pval_cutoff, "Sig", "NS")
+
+  df[[pval_nm]] <- -log10(df[[pval_nm]])
+
+  ggplot(df, aes(x=log2FoldChange, y=.data[[pval_nm]])) +
+    geom_point(aes(color=Sig), size=0.6) +
+    scale_color_manual(values=c("black", "salmon")) +
+    theme_bw() + ylab(stringr::str_glue("-log10(", pval_nm,")")) +
+    ggrepel::geom_text_repel(data=df |> dplyr::filter(uniq_symbol %in% top_genes$uniq_symbol),
+                    aes(label=uniq_symbol), max.overlaps=Inf, min.segment.length = 0) +
+    ggprism::scale_color_prism() +
+    ggprism::scale_fill_prism()
+}
+
+make_volcano(out_df, pval_nm="padj", pval_cutoff=0.05)
+```
+
+## Play around with contrast vectors
+
+```{r, Contrast Vector}
+print("model coefficients")
+resultsNames(dds)
+
+print("model matrix - truseq and untreated are the refence levels")
+model.matrix(design(dds), colData(dds))
+
+untrt_truseq <- c(1,0,0,0)
+trt_truseq <- c(1,1,0,0)
+untrt_pico <- c(1,0,1,0)
+untrt_v4 <- c(1,0,0,1)
+
+results(dds, contrast = trt_truseq - untrt_truseq)
+results(dds, contrast = list('ilb_trt_treated_vs_untreated'))
+
+results(dds, contrast = list('kit_v4_vs_truseq'))
+results(dds, contrast = untrt_v4 - untrt_truseq)
+```
