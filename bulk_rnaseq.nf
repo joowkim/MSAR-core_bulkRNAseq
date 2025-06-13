@@ -212,6 +212,7 @@ process qualimap {
 
     script:
     gtf = params.gtf.(params.genome)
+    qualimap = "/mnt/beegfs/kimj32/tools/qualimap/2.2.1/qualimap"
 
     // Can't connect to X11 window server using 'localhost:22.0' as the value of the DISPLAY variable. export DISPLAY=:0.0
     // https://stackoverflow.com/questions/10165761/java-cant-connect-to-x11-window-server-using-localhost10-0-as-the-value-of-t
@@ -221,7 +222,7 @@ process qualimap {
     if (!is_SE) {
         // if sample is paired end data
     """
-    qualimap rnaseq -bam ${bam} \\
+    ${qualimap} rnaseq -bam ${bam} \\
         -gtf ${gtf} \\
         --paired \\
         -outdir quailmap_${sample_name} \\
@@ -231,7 +232,7 @@ process qualimap {
     } else {
         // if sample is single end data
     """
-    qualimap rnaseq -bam ${bam} \\
+    ${qualimap} rnaseq -bam ${bam} \\
         -gtf ${gtf} \\
         -outdir quailmap_${sample_name} \\
         --java-mem-size=${task.memory.toGiga()}G \\
@@ -473,6 +474,31 @@ process gene_count_mat {
     script:
     "Rscript ${projectDir}/bin/star_to_mat.R ./"
 }
+
+
+process feature_count{
+    tag "feature count"
+    label "process_low"
+
+    module "subread/2.0.6"
+    publishDir "${projectDir}/analysis/feature_count", mode: "copy"
+
+    input:
+    tuple val(sample_name), path(bam), val(is_SE)
+
+    output:
+    path("*")
+    path("${sample_name}*.txt.summary"), emit: feature_count_summary
+
+    script:
+    def featureCount = "/cm/shared/apps/subread/2.0.6/bin/featureCounts"
+    def gtf = params.gtf.(params.genome)
+    """
+        ${featureCount} -p --countReadPairs -C -T ${task.cpus} -t exon -g gene_id -a ${gtf} -s 2 -o ${sample_name}_rev_strand_cnt.txt ${bam}
+    """
+    //
+
+}
 // process kraken2{
 //     tag "${sample_name}"
 //     cpus 12
@@ -588,6 +614,8 @@ workflow {
     qualimap(samtools_index.out.bam)
 
     gene_count_mat(star.out.read_per_gene_out.collect())
+
+    feature_count(star.out.bam)
 
     }
 
