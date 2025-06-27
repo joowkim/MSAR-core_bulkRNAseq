@@ -102,7 +102,7 @@ process ribo_detector {
 
 process star {
     tag "${sample_name}"
-    label "memory_high"
+    label "memory_medium"
 
     publishDir "${projectDir}/analysis/star/", mode : "copy"
 
@@ -196,13 +196,14 @@ process samtools_index {
     """
 }
 
+
 process qualimap {
     tag "${sample_name}"
     label "memory_medium"
 
     publishDir "${projectDir}/analysis/qualimap/"
 
-    module 'qualimap/2.2.1'
+    // module 'qualimap/2.2.1'
 
     input:
     tuple val(sample_name), path(bam), val(is_SE)
@@ -241,6 +242,7 @@ process qualimap {
     } // end if else
 } // end process
 
+
 process salmon {
     tag "${sample_name}"
     label "memory_medium"
@@ -272,6 +274,7 @@ process salmon {
     """
 }
 
+
 process seqtk {
     tag "${sample_name}"
     label "process_low"
@@ -298,6 +301,7 @@ process seqtk {
     """
     }
 }
+
 
 process sortMeRNA {
     tag "${sample_name}"
@@ -360,6 +364,7 @@ process sortMeRNA {
      // --idx-dir ${idx}  \\
 }
 
+
 process fastq_screen {
     tag "${sample_name}"
     label "process_medium"
@@ -399,6 +404,7 @@ process fastq_screen {
     }
 }
 
+
 process multiqc {
     label "process_dual"
     time "1h"
@@ -419,6 +425,7 @@ process multiqc {
     multiqc ${files} --filename "multiqc_report.html" --ignore '*STARpass1' --config ${config_yaml}
     """
 }
+
 
 process tpm_calculator {
     tag "tpm_calculator on ${sample_name}"
@@ -494,9 +501,10 @@ process feature_count{
     def featureCount = "/cm/shared/apps/subread/2.0.6/bin/featureCounts"
     def gtf = params.gtf.(params.genome)
     """
-        ${featureCount} -p --countReadPairs -C -T ${task.cpus} -t exon -g gene_id -a ${gtf} -s 2 -o ${sample_name}_rev_strand_cnt.txt ${bam}
+        ${featureCount} -p  --extraAttributes "gene_biotype" --countReadPairs -C -T ${task.cpus} -t exon -g gene_id -a ${gtf} -s 2 -o ${sample_name}_rev_strand_cnt.txt ${bam}
     """
     //
+
 
 }
 // process kraken2{
