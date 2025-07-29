@@ -203,7 +203,7 @@ process qualimap {
 
     publishDir "${projectDir}/analysis/qualimap/"
 
-    // module 'qualimap/2.2.1'
+    module 'qualimap/2.3'
 
     input:
     tuple val(sample_name), path(bam), val(is_SE)
@@ -213,7 +213,7 @@ process qualimap {
 
     script:
     gtf = params.gtf.(params.genome)
-    qualimap = "/mnt/beegfs/kimj32/tools/qualimap/2.2.1/qualimap"
+    // qualimap = "/mnt/beegfs/kimj32/tools/qualimap/2.2.1/qualimap"
 
     // Can't connect to X11 window server using 'localhost:22.0' as the value of the DISPLAY variable. export DISPLAY=:0.0
     // https://stackoverflow.com/questions/10165761/java-cant-connect-to-x11-window-server-using-localhost10-0-as-the-value-of-t
@@ -223,7 +223,7 @@ process qualimap {
     if (!is_SE) {
         // if sample is paired end data
     """
-    ${qualimap} rnaseq -bam ${bam} \\
+    qualimap rnaseq -bam ${bam} \\
         -gtf ${gtf} \\
         --paired \\
         -outdir quailmap_${sample_name} \\
@@ -233,7 +233,7 @@ process qualimap {
     } else {
         // if sample is single end data
     """
-    ${qualimap} rnaseq -bam ${bam} \\
+    qualimap rnaseq -bam ${bam} \\
         -gtf ${gtf} \\
         -outdir quailmap_${sample_name} \\
         --java-mem-size=${task.memory.toGiga()}G \\
@@ -349,7 +349,7 @@ process sortMeRNA {
      """
      sortmerna \\
         --threads ${threads} \
-        -reads ${reads[1]} \
+        -reads ${reads[0]} \
         --workdir sortMeRNA_${sample_name}  \
         --ref ${rfam5s}  \
         --ref ${rfam5_8s}  \
@@ -608,7 +608,8 @@ workflow {
     star(ribo_detector.out.rRNA_filt_reads)
     samtools_index(star.out.bam)
 
-    preseq(samtools_index.out.bam)
+    // for some reason, preseq throws errors
+    // preseq(samtools_index.out.bam)
     qualimap(samtools_index.out.bam)
 
     gene_count_mat(star.out.read_per_gene_out.collect())
@@ -618,7 +619,7 @@ workflow {
     star(fastp.out.trim_reads)
     samtools_index(star.out.bam)
 
-    preseq(samtools_index.out.bam)
+    // preseq(samtools_index.out.bam)
     qualimap(samtools_index.out.bam)
 
     gene_count_mat(star.out.read_per_gene_out.collect())
@@ -629,9 +630,9 @@ workflow {
 
     if (params.run_salmon) {
         salmon(fastp.out.trim_reads)
-        multiqc(qualimap.out.qualimap_out.mix(sortMeRNA.out.sortMeRNA_out, salmon.out.salmon_out, star.out.log_final, star.out.read_per_gene_out, fastqc.out.zips, fastq_screen.out.fastq_screen_out, fastp.out.fastp_json, preseq.out.preseq_output).collect())
+        multiqc(qualimap.out.qualimap_out.mix(sortMeRNA.out.sortMeRNA_out, salmon.out.salmon_out, star.out.log_final, star.out.read_per_gene_out, fastqc.out.zips, fastq_screen.out.fastq_screen_out, fastp.out.fastp_json).collect())
     } else {
-        multiqc( qualimap.out.qualimap_out.mix(sortMeRNA.out.sortMeRNA_out, star.out.log_final, star.out.read_per_gene_out, fastqc.out.zips, fastq_screen.out.fastq_screen_out, fastp.out.fastp_json, preseq.out.preseq_output).collect() )
+        multiqc( qualimap.out.qualimap_out.mix(sortMeRNA.out.sortMeRNA_out, star.out.log_final, star.out.read_per_gene_out, fastqc.out.zips, fastq_screen.out.fastq_screen_out, fastp.out.fastp_json).collect() )
     }
 
     if (params.run_tpm_calculator) {
