@@ -473,13 +473,30 @@ process gene_count_mat {
 
     input:
     path(read_per_gene_out)
-    //
 
     output:
-    path("star_read_cnt.tsv")
+    path("star_read_cnt.tsv"), emit : "gene_count_mat_out"
 
     script:
     "Rscript ${projectDir}/bin/star_to_mat.R ./"
+}
+
+process gene_id_to_gene_symbol {
+    tag "gene count mat"
+    label "process_dual"
+
+    module "R/4.3.1"
+    publishDir "${projectDir}/analysis/gene_symbol_count_matrix", mode: "copy"
+
+    input:
+    path(count_table)
+
+    output:
+    path("gene_cnt_table.tsv")
+
+    script:
+    def ref_gene_symbol_table = params.gene_symbol_table.(params.genome)
+    "Rscript ${projectDir}/bin/gene_symbol_annot.R ${count_table} ${ref_gene_symbol_table}"
 }
 
 
@@ -613,6 +630,7 @@ workflow {
     qualimap(samtools_index.out.bam)
 
     gene_count_mat(star.out.read_per_gene_out.collect())
+    gene_id_to_gene_symbol(gene_count_mat.out.gene_count_mat_out)
 
     } else {
 
@@ -623,6 +641,7 @@ workflow {
     qualimap(samtools_index.out.bam)
 
     gene_count_mat(star.out.read_per_gene_out.collect())
+    gene_id_to_gene_symbol(gene_count_mat.out.gene_count_mat_out)
 
     feature_count(star.out.bam)
 
