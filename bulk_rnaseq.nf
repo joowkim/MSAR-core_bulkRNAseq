@@ -1,5 +1,7 @@
 nextflow.enable.dsl=2
 
+include { kraken2 } from './modules/kraken2'
+
 process fastqc {
     tag "${meta.sample_name}"
     label "process_medium"
@@ -33,11 +35,11 @@ process fastp {
     tuple val(meta), path(reads)
 
     output:
-    tuple val(meta.sample_name), path("${meta.sample_name}_trimmed_R{1,2}.fastq.gz"), val(meta.single_end), emit: trim_reads
+    tuple val(meta.sample_name), path("${meta.sample_name}_trimmed_R*.fastq.gz"), val(meta.single_end), emit: trim_reads
     path("${meta.sample_name}.fastp.json"), emit: fastp_json
 
     script:
-    def adapter = "/mnt/beegfs/kimj32/reference/adapters.fa"
+    // def adapter = "/mnt/beegfs/kimj32/reference/adapters.fa"
     if(!meta.single_end) {
     """
     fastp \
@@ -46,7 +48,6 @@ process fastp {
         --thread ${task.cpus} \
         -o ${meta.sample_name}_trimmed_R1.fastq.gz \
         -O ${meta.sample_name}_trimmed_R2.fastq.gz \
-        --adapter_fasta $adapter \
         --trim_front1 1 \
         --trim_front2 1 \
         --json ${meta.sample_name}.fastp.json
@@ -57,7 +58,6 @@ process fastp {
         -i ${reads} \
         --thread ${task.cpus} \
         -o ${meta.sample_name}_trimmed_R1.fastq.gz \
-        --adapter_fasta $adapter \
         --trim_front1 1 \
         --json ${meta.sample_name}.fastp.json
     """
@@ -90,7 +90,7 @@ process ribo_detector {
     } else {
     """
     ribodetector_cpu -t ${task.cpus} \
-        -i ${reads[0]} ${reads[1]} \
+        -i ${reads[0]} \
         -l 150 \
         -e rRNA \
         -o ${sample_name}_rRNA_filt_R1.fastq.gz \
@@ -125,6 +125,7 @@ process star {
 
     script:
     index = params.star_index.(params.genome)
+    if (!is_SE) {
     """
     STAR \
         --runThreadN ${task.cpus} \
@@ -141,6 +142,24 @@ process star {
     gzip -c "${sample_name}.Unmapped.out.mate1" > "${sample_name}_Unmapped_R1.fastq.gz"
     gzip -c "${sample_name}.Unmapped.out.mate2" > "${sample_name}_Unmapped_R2.fastq.gz"
     """
+    } else {
+    """
+    STAR \
+        --runThreadN ${task.cpus} \
+        --genomeDir ${index} \
+        --readFilesIn ${reads} \
+        --twopassMode Basic \
+        --readFilesCommand zcat \
+        --outSAMtype BAM SortedByCoordinate \
+        --outFileNamePrefix ${sample_name}. \
+        --quantMode GeneCounts \
+        --outReadsUnmapped Fastx \
+        --outStd Log 2> ${sample_name}.log
+
+    gzip -c "${sample_name}.Unmapped.out.mate1" > "${sample_name}_Unmapped_R1.fastq.gz"
+    touch "${sample_name}_Unmapped_R2.fastq.gz"
+    """
+    }
     // samtools index ${sample_name}.Aligned.sortedByCoord.out.bam
 }
 
@@ -287,7 +306,7 @@ process seqtk {
     tuple val(sample_name), path(reads), val(is_SE)
 
     output:
-    tuple val(sample_name), path("${sample_name}.subsample.100000.R{1,2}.fq.gz"), val(is_SE), emit: subsample_reads
+    tuple val(sample_name), path("${sample_name}.subsample.100000.R*.fq.gz"), val(is_SE), emit: subsample_reads
 
     script:
     if(!is_SE) {
@@ -319,20 +338,18 @@ process sortMeRNA {
 
     script:
     def threads = task.cpus
-    def idx = "/mnt/beegfs/kimj32/tools/sortmerna/idx"
-    def rfam5_8s = "/mnt/beegfs/kimj32/tools/sortmerna/data/rRNA_databases/rfam-5.8s-database-id98.fasta"
-    def rfam5s = "/mnt/beegfs/kimj32/tools/sortmerna/data/rRNA_databases/rfam-5s-database-id98.fasta"
-    def silva_arc_16s = "/mnt/beegfs/kimj32/tools/sortmerna/data/rRNA_databases/silva-arc-16s-id95.fasta"
-    def silva_arc_23s = "/mnt/beegfs/kimj32/tools/sortmerna/data/rRNA_databases/silva-arc-23s-id98.fasta"
-    def silva_euk_18s = "/mnt/beegfs/kimj32/tools/sortmerna/data/rRNA_databases/silva-euk-18s-id95.fasta"
-    def silva_euk_28s = "/mnt/beegfs/kimj32/tools/sortmerna/data/rRNA_databases/silva-euk-28s-id98.fasta"
-    def silva_bac_16s = "/mnt/beegfs/kimj32/tools/sortmerna/data/rRNA_databases/silva-bac-16s-id90.fasta"
-    def silva_bac_23s = "/mnt/beegfs/kimj32/tools/sortmerna/data/rRNA_databases/silva-bac-23s-id98.fasta"
+    def db = params.sortmerna_db
+    def rfam5_8s = "${db}/rfam-5.8s-database-id98.fasta"
+    def rfam5s = "${db}/rfam-5s-database-id98.fasta"
+    def silva_arc_16s = "${db}/silva-arc-16s-id95.fasta"
+    def silva_arc_23s = "${db}/silva-arc-23s-id98.fasta"
+    def silva_euk_18s = "${db}/silva-euk-18s-id95.fasta"
+    def silva_euk_28s = "${db}/silva-euk-28s-id98.fasta"
+    def silva_bac_16s = "${db}/silva-bac-16s-id90.fasta"
+    def silva_bac_23s = "${db}/silva-bac-23s-id98.fasta"
 
-    // single-end
-    if(is_SE) {
-     """
-     sortmerna \\
+    """
+    sortmerna \\
         --threads ${threads} \\
         -reads ${reads[0]} \\
         --workdir sortMeRNA_${sample_name}  \\
@@ -344,33 +361,14 @@ process sortMeRNA {
         --ref ${silva_bac_23s}  \\
         --ref ${silva_euk_18s}  \\
         --ref ${silva_euk_28s}
-     """
-    } else {
-     """
-     sortmerna \\
-        --threads ${threads} \
-        -reads ${reads[0]} \
-        --workdir sortMeRNA_${sample_name}  \
-        --ref ${rfam5s}  \
-        --ref ${rfam5_8s}  \
-        --ref ${silva_arc_16s}  \
-        --ref ${silva_arc_23s}  \
-        --ref ${silva_bac_16s}  \
-        --ref ${silva_bac_23s}  \
-        --ref ${silva_euk_18s}  \
-        --ref ${silva_euk_28s}
-     """
-    }
+    """
      // --idx-dir ${idx}  \\
 }
 
 
 process fastq_screen {
     tag "${sample_name}"
-    label "process_medium"
-
-    cpus 8
-    memory '16 GB'
+    label "process_low"
 
     publishDir "${projectDir}/analysis/fastq_screen"
 
@@ -420,9 +418,8 @@ process multiqc {
     path("*.html"), emit: multiqc_output
 
     script:
-    config_yaml = "/home/kimj32/config_defaults.yaml"
     """
-    multiqc ${files} --filename "multiqc_report.html" --ignore '*STARpass1' --config ${config_yaml}
+    multiqc ${files} --filename "multiqc_report.html" --ignore '*STARpass1' --config ${params.multiqc_config}
     """
 }
 
@@ -518,68 +515,9 @@ process feature_count{
     def featureCount = "/cm/shared/apps/subread/2.0.6/bin/featureCounts"
     def gtf = params.gtf.(params.genome)
     """
-        ${featureCount} -p  --extraAttributes "gene_biotype" --countReadPairs -C -T ${task.cpus} -t exon -g gene_id -a ${gtf} -s 2 -o ${sample_name}_rev_strand_cnt.txt ${bam}
+    ${featureCount} -p --extraAttributes "gene_biotype" --countReadPairs -C -T ${task.cpus} -t exon -g gene_id -a ${gtf} -s 2 -o ${sample_name}_rev_strand_cnt.txt ${bam}
     """
-    //
-
-
 }
-// process kraken2{
-//     tag "${sample_name}"
-//     cpus 12
-//     memory "84 GB"
-//
-//     publishDir "${projectDir}/analysis/kraken2/"
-//
-//     module "kraken/2.1.2"
-//
-//     input:
-//     tuple val(sample_name), path(reads), val(is_SE)
-//
-//     output:
-//
-// }
-/* process trim_galore {
-    //debug true
-    tag "${meta.sample_name}"
-    cpus 4
-    memory '8 GB'
-    time "2h"
-
-    publishDir "${projectDir}/analysis/trim_galore/"
-
-    input:
-    tuple val(meta), path(reads)
-
-    output:
-    tuple val(meta.sample_name), path("*.gz"), val(meta.single_end), emit: trim_reads
-    path("*.html")
-    path("*.zip")
-    path("*.txt")
-
-    script:
-    def threads = task.cpus - 1
-    if(!meta.single_end) {
-    """
-    trim_galore \
-    --paired \
-    ${reads} \
-    --cores ${threads} \
-    -q 20 \
-    --fastqc \
-    --output_dir ./
-    """
-    } else {
-    """
-    trim_galore \
-    ${reads[0]} \
-    --cores ${task.cpus} \
-    -q 20 \
-    --fastqc \
-    --output_dir ./
-    """
-    }
-} */
 
 log.info """
 bulkRNAseq Nextflow
@@ -587,8 +525,6 @@ bulkRNAseq Nextflow
 samplesheet                           : ${params.samplesheet}
 reference                       : ${params.ref_fa.(params.genome)}
 """
-
-reference = Channel.fromPath(params.ref_fa.(params.genome), checkIfExists: true)
 
 // See https://bioinformatics.stackexchange.com/questions/20227/how-does-one-account-for-both-single-end-and-paired-end-reads-as-input-in-a-next
 ch_samplesheet = Channel.fromPath(params.samplesheet, checkIfExists: true)
@@ -614,45 +550,49 @@ ch_reads = ch_samplesheet.splitCsv(header:true).map {
 workflow {
 
     fastqc(ch_reads)
-    // trim_galore(ch_reads)
     fastp(ch_reads)
     seqtk(fastp.out.trim_reads)
     fastq_screen(seqtk.out.subsample_reads)
     sortMeRNA(seqtk.out.subsample_reads)
 
     if (params.run_ribodetector) {
-    ribo_detector(fastp.out.trim_reads)
-    star(ribo_detector.out.rRNA_filt_reads)
-    samtools_index(star.out.bam)
-
-    // for some reason, preseq throws errors
-    // preseq(samtools_index.out.bam)
-    qualimap(samtools_index.out.bam)
-
-    gene_count_mat(star.out.read_per_gene_out.collect())
-    gene_id_to_gene_symbol(gene_count_mat.out.gene_count_mat_out)
-
+        ribo_detector(fastp.out.trim_reads)
+        star(ribo_detector.out.rRNA_filt_reads)
     } else {
+        star(fastp.out.trim_reads)
+    }
 
-    star(fastp.out.trim_reads)
     samtools_index(star.out.bam)
 
-    // preseq(samtools_index.out.bam)
+    if (params.run_preseq) {
+        preseq(samtools_index.out.bam)
+    }
     qualimap(samtools_index.out.bam)
 
     gene_count_mat(star.out.read_per_gene_out.collect())
     gene_id_to_gene_symbol(gene_count_mat.out.gene_count_mat_out)
-
     feature_count(star.out.bam)
 
+    if (params.run_kraken2) {
+        kraken2(star.out.unmapped_reads)
     }
 
     if (params.run_salmon) {
-        salmon(fastp.out.trim_reads)
-        multiqc(qualimap.out.qualimap_out.mix(sortMeRNA.out.sortMeRNA_out, salmon.out.salmon_out, star.out.log_final, star.out.read_per_gene_out, fastqc.out.zips, fastq_screen.out.fastq_screen_out, fastp.out.fastp_json).collect())
-    } else {
-        multiqc( qualimap.out.qualimap_out.mix(sortMeRNA.out.sortMeRNA_out, star.out.log_final, star.out.read_per_gene_out, fastqc.out.zips, fastq_screen.out.fastq_screen_out, fastp.out.fastp_json).collect() )
+        salmon(params.run_ribodetector ? ribo_detector.out.rRNA_filt_reads : fastp.out.trim_reads)
     }
+
+    def multiqc_input = qualimap.out.qualimap_out
+        .mix(sortMeRNA.out.sortMeRNA_out)
+        .mix(star.out.log_final)
+        .mix(star.out.read_per_gene_out)
+        .mix(fastqc.out.zips)
+        .mix(fastq_screen.out.fastq_screen_out)
+        .mix(fastp.out.fastp_json)
+
+    if (params.run_salmon)        { multiqc_input = multiqc_input.mix(salmon.out.salmon_out) }
+    if (params.run_kraken2)       { multiqc_input = multiqc_input.mix(kraken2.out.kraken2_report) }
+
+    multiqc(multiqc_input.collect())
 
     if (params.run_tpm_calculator) {
         tpm_calculator(star.out.bam)
